@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(255)
+  price        Int
+  oldPrice     Int?     @map("old_price")
+  club         String?  @db.VarChar(100)
+  category     String   @db.VarChar(100) // ex: "jersey", "T-shirts", "hoodies-sweats"
+  stock        Int      @default(0)
+  isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
+  images       String[]
+
+  // Gestion dynamique des 5 tailles {S: boolean, M: boolean, etc.}
+  sizes        Json     @default("{\"S\":true,\"M\":true,\"L\":true,\"XL\":true,\"XXL\":true}")
+
+  // Filtres vestiaires
+  gender       String   @default("unisex") @db.VarChar(20) // unisex / men / women
+  collection   String   @default("Street Classic") @db.VarChar(100)
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("products")
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  total     Int
+  status    String      @default("pending") @db.VarChar(50)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
+  items     OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int      @map("order_id")
+  productName String   @map("product_name") @db.VarChar(255)
+  size        String?  @db.VarChar(10)
+  price       Int
+  qty         Int
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_items")
+}
