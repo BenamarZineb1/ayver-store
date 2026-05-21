@@ -13,19 +13,14 @@ model Product {
   price        Int
   oldPrice     Int?     @map("old_price")
   club         String?  @db.VarChar(100)
-  category     String   @db.VarChar(100) // ex: "jersey", "T-shirts", "hoodies-sweats"
+  category     String   @db.VarChar(100)
   stock        Int      @default(0)
-  isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
-  images       String[]
-
-  // Gestion dynamique des 5 tailles {S: boolean, M: boolean, etc.}
-  sizes        Json     @default("{\"S\":true,\"M\":true,\"L\":true,\"XL\":true,\"XXL\":true}")
-
-  // Filtres vestiaires
-  gender       String   @default("unisex") @db.VarChar(20) // unisex / men / women
-  collection   String   @default("Street Classic") @db.VarChar(100)
-
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  images       String[]
+  collection   String   @default("Street Classic") @db.VarChar(100)
+  gender       String   @default("unisex") @db.VarChar(20)
+  isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
+  sizes        Json     @default("{\"L\": true, \"M\": true, \"S\": true, \"XL\": true, \"XXL\": true}")
 
   @@map("products")
 }
@@ -41,13 +36,13 @@ model Order {
 }
 
 model OrderItem {
-  id          Int      @id @default(autoincrement())
-  orderId     Int      @map("order_id")
-  productName String   @map("product_name") @db.VarChar(255)
-  size        String?  @db.VarChar(10)
+  id          Int     @id @default(autoincrement())
+  orderId     Int     @map("order_id")
+  productName String  @map("product_name") @db.VarChar(255)
+  size        String? @db.VarChar(10)
   price       Int
   qty         Int
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("order_items")
 }
