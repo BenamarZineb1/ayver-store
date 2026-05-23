@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -12,20 +12,30 @@ interface ColorVariant {
   images: string[];
 }
 
+interface ProductForm {
+  name: string;
+  price: string;
+  category: string;
+  gender: string;
+  club: string;
+  sizes: Record<string, boolean>;
+}
+
 export default function EditProduct() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
+  const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : null;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ProductForm>({
     name: "",
     price: "",
     category: "jersey",
     gender: "unisex",
     club: "",
-    sizes: {} as Record<string, boolean>
+    sizes: {}
   });
 
   const [variants, setVariants] = useState<ColorVariant[]>([]);
@@ -36,28 +46,30 @@ export default function EditProduct() {
     fetch(`/api/products/${id}`)
       .then((res) => res.json())
       .then((data) => {
+        if (data.error) throw new Error(data.error);
+
         const productCategory = data.category || "jersey";
-        let productSizes = data.sizes || {};
+        let productSizes = { ...(data.sizes || {}) };
 
         if (Object.keys(productSizes).length === 0 && productCategory !== "accessories") {
           const targetGrid = productCategory === "sneakers" ? SNEAKER_SIZES : CLOTHING_SIZES;
-          targetGrid.forEach((sz) => { productSizes[sz] = true; });
+          targetGrid.forEach((sz) => { productSizes[sz] = false; });
         }
 
         setForm({
           name: data.name || "",
-          price: data.price || "",
+          price: data.price ? String(data.price) : "",
           category: productCategory,
           gender: data.gender || "unisex",
           club: data.club || "",
           sizes: productSizes,
         });
 
-        setVariants(data.variants || [{ color: "Standard", images: [] }]);
+        setVariants(data.variants && data.variants.length > 0 ? data.variants : [{ color: "Standard", images: [] }]);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Erreur chargement produit:", err);
+        console.error("Erreur lors du chargement du produit AYVER:", err);
         setLoading(false);
       });
   }, [id]);
@@ -65,11 +77,15 @@ export default function EditProduct() {
   function handleCategoryChange(newCategory: string) {
     let updatedSizes: Record<string, boolean> = {};
     if (newCategory === "sneakers") {
-      SNEAKER_SIZES.forEach(sz => { updatedSizes[sz] = true; });
+      SNEAKER_SIZES.forEach(sz => {
+        updatedSizes[sz] = form.sizes[sz] ?? (sz === "40" || sz === "41");
+      });
     } else if (newCategory === "accessories") {
       updatedSizes = {};
     } else {
-      CLOTHING_SIZES.forEach(sz => { updatedSizes[sz] = true; });
+      CLOTHING_SIZES.forEach(sz => {
+        updatedSizes[sz] = form.sizes[sz] ?? (sz === "M");
+      });
     }
     setForm(prev => ({ ...prev, category: newCategory, sizes: updatedSizes }));
   }
@@ -89,21 +105,25 @@ export default function EditProduct() {
     setVariants(updated);
   }
 
-  // CORRECTION 6 : Rerender React sécurisé avec .map() pour l'édition d'images
-  function handleImages(e: any, variantIndex: number) {
+  function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
+    if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    files.forEach((file: any) => {
+
+    files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setVariants((prev) =>
-          prev.map((variant, i) => {
-            if (i !== variantIndex) return variant;
-            return {
-              ...variant,
-              images: [...(variant.images || []), reader.result as string]
-            };
-          })
-        );
+        if (typeof reader.result === "string") {
+          const base64String = reader.result;
+          setVariants((prev) =>
+            prev.map((variant, i) => {
+              if (i !== variantIndex) return variant;
+              return {
+                ...variant,
+                images: [...(variant.images || []), base64String]
+              };
+            })
+          );
+        }
       };
       reader.readAsDataURL(file);
     });
@@ -122,20 +142,19 @@ export default function EditProduct() {
   }
 
   function toggleSize(size: string) {
-    setForm((prev: any) => ({
+    setForm((prev) => ({
       ...prev,
       sizes: { ...prev.sizes, [size]: !prev.sizes[size] }
     }));
   }
 
-  async function handleUpdate(e: any) {
+  async function handleUpdate(e: FormEvent) {
     e.preventDefault();
+    if (!id) return;
     setSubmitting(true);
 
     const hasSizes = Object.keys(form.sizes).length > 0;
     const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
-
-    // CORRECTION 2 : On prend la première image valide disponible n'importe où
     const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
 
     const payload = {
@@ -145,7 +164,6 @@ export default function EditProduct() {
       isOutOfStock: isGloballyOutOfStock,
       variants: variants,
       image: firstImageUrl,
-      // On sauvegarde toutes les images cumulées
       images: variants.flatMap(v => v.images || [])
     };
 
@@ -158,26 +176,28 @@ export default function EditProduct() {
 
       if (!res.ok) throw new Error("Erreur lors de la mise à jour");
 
-      router.push("/admin/products");
+      router.push("/admin");
       router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Une erreur est survenue lors de l'enregistrement.");
+      alert("Une erreur est survenue lors de l'enregistrement des modifications.");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
+    if (!id) return;
     const confirmDelete = confirm("Supprimer définitivement ce produit du catalogue AYVER ?");
     if (!confirmDelete) return;
     try {
-      await fetch(`/api/products/${id}`, { method: "DELETE" });
-      router.push("/admin/products");
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erreur suppression");
+      router.push("/admin");
       router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Erreur lors de la suppression.");
+      alert("Erreur lors de la suppression du produit.");
     }
   }
 
@@ -193,10 +213,15 @@ export default function EditProduct() {
     );
   }
 
+  const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
+    if (!isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) - Number(b);
+    return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
+  });
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
@@ -254,7 +279,7 @@ export default function EditProduct() {
           </div>
           <div className="header-actions">
             <button type="button" className="btn-delete-top" onClick={handleDelete}>Supprimer l'article</button>
-            <Link href="/admin/products" className="btn-back">Retour</Link>
+            <Link href="/admin" className="btn-back">Retour</Link>
           </div>
         </header>
 
@@ -314,7 +339,7 @@ export default function EditProduct() {
                   {form.category === "sneakers" ? "Modifier l'état des Pointures" : "Modifier l'état des Tailles"}
                 </div>
                 <div className="sizes-grid">
-                  {Object.keys(form.sizes).map((size) => {
+                  {sortedSizes.map((size) => {
                     const isAvailable = form.sizes[size];
                     return (
                       <button
@@ -384,7 +409,7 @@ export default function EditProduct() {
               <button className="btn-submit-product" disabled={submitting}>
                 {submitting ? "Mise à jour en cours..." : "Enregistrer les modifications"}
               </button>
-              <Link href="/admin/products" className="btn-cancel">Annuler</Link>
+              <Link href="/admin" className="btn-cancel">Annuler</Link>
             </div>
           </form>
         </main>

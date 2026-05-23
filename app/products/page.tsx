@@ -107,13 +107,27 @@ export default function CatalogPage() {
     setViewMode('products');
   };
 
+  const handleBackToCategories = () => {
+    setSelectedCategory("all");
+    setSelectedSize("M");
+    setViewMode('categories');
+  };
+
   const handleAddToCart = (e: React.MouseEvent, product: any) => {
     e.stopPropagation();
     if (product.stock === 0 || product.isOutOfStock) return;
 
     const finalSize = product.category === "accessories" ? "Unique" : selectedSize;
+    const displayImage = product.images?.[0] || product.variants?.[0]?.images?.[0] || "/placeholder.jpg";
 
-    addToCart({ id: product.id, name: product.name, price: product.price, size: finalSize });
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      size: finalSize,
+      image: displayImage
+    } as any);
+
     setAddedProduct(product.name);
     setTimeout(() => setAddedProduct(null), 3000);
   };
@@ -216,7 +230,7 @@ export default function CatalogPage() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght@200;300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         :root{
@@ -245,10 +259,11 @@ export default function CatalogPage() {
         .section-title em { font-style:italic; color:var(--accent); font-weight:400; }
 
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-        .cat-card { position: relative; aspect-ratio: 3/4; border-radius: 4px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; padding: 30px; border: 1px solid rgba(196,168,130,0.1); transition: transform 0.4s ease, border-color 0.3s; }
+        .cat-card { position: relative; aspect-ratio: 3/4; border-radius: 4px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; padding: 30px; border: 1px solid rgba(196,168,130,0.1); transition: transform 0.4s ease, border-color 0.3s; background-size: cover !important; background-position: center !important; }
         .cat-card:hover { transform: translateY(-4px); border-color: var(--gold); }
-        .cat-img-mock { font-family: 'Playfair Display', serif; font-size: 110px; font-weight: 900; color: rgba(255,255,255,0.03); position: absolute; top: 20px; right: 20px; pointer-events: none; font-style: italic; }
-        .cat-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(19,28,20,0) 40%, rgba(19,28,20,0.9) 100%); z-index: 1; }
+        .cat-img-mock { font-family: 'Playfair Display', serif; font-size: 110px; font-weight: 900; color: rgba(255,255,255,0.03); position: absolute; top: 20px; right: 20px; pointer-events: none; font-style: italic; z-index: 2; }
+        .cat-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(19,28,20,0.1) 20%, rgba(19,28,20,0.85) 100%); z-index: 1; transition: background 0.3s; }
+        .cat-card:hover .cat-overlay { background: linear-gradient(to bottom, rgba(19,28,20,0.3) 20%, rgba(19,28,20,0.95) 100%); }
         .cat-pill { position: relative; z-index: 2; align-self: flex-start; background: var(--gold); color: var(--dark); font-size: 9px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; }
         .cat-info { position: relative; z-index: 2; margin-top: auto; }
         .cat-name { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 600; color: var(--cream); margin-bottom: 12px; }
@@ -312,9 +327,7 @@ export default function CatalogPage() {
         .btn-footer { border:1px solid rgba(196,168,130,0.3); background:transparent; color:var(--cream); padding:12px 24px; font-size:11px; font-family:'Jost',sans-serif; letter-spacing:2px; text-transform:uppercase; text-decoration:none; transition:all 0.3s; display:inline-flex; align-items:center; gap:8px; }
         .btn-footer:hover { background:var(--cream); color:var(--dark); border-color:var(--cream); }
 
-        @media(max-width:1100px){
-          .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        }
+        @media(max-width:1100px){ .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; } }
         @media(max-width:900px){
           .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
           .shop-container { grid-template-columns: 1fr; gap:20px; padding-top: 20px; }
@@ -342,7 +355,7 @@ export default function CatalogPage() {
       <nav id="navbar">
         <div className="nav-links">
           {viewMode === 'products' ? (
-            <button className="nav-back-btn" onClick={() => setViewMode('categories')}>← LES UNIVERS</button>
+            <button className="nav-back-btn" onClick={handleBackToCategories}>← LES UNIVERS</button>
           ) : (
             <Link href="/">← ACCUEIL</Link>
           )}
@@ -360,7 +373,7 @@ export default function CatalogPage() {
         </div>
       </nav>
 
-      {/* ÉTAPE 1 : GRILLE DES CATÉGORIES */}
+      {/* ÉTAPE 1 : GRILLE DES CATÉGORIES AVEC COUVERTURES RÉELLES */}
       {viewMode === 'categories' && (
         <section className="categories" id="collections">
           <div className="section-header">
@@ -369,7 +382,7 @@ export default function CatalogPage() {
           </div>
 
           <div className="cat-grid">
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#1c1a2f,#090912)" }} onClick={() => handleSelectCategoryFromCard("jersey")}>
+            <div className="cat-card" style={{ background: "url('/jerseys.jpg')" }} onClick={() => handleSelectCategoryFromCard("jersey")}>
               <div className="cat-img-mock">M</div>
               <div className="cat-overlay"></div>
               <div className="cat-pill">Retro</div>
@@ -379,7 +392,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#1a1a1a,#0b0b0b)" }} onClick={() => handleSelectCategoryFromCard("T-shirts")}>
+            <div className="cat-card" style={{ background: "url('/tshirtsoversize.png')" }} onClick={() => handleSelectCategoryFromCard("T-shirts")}>
               <div className="cat-img-mock">T</div>
               <div className="cat-overlay"></div>
               <div className="cat-info">
@@ -388,7 +401,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#242435,#0e0e16)" }} onClick={() => handleSelectCategoryFromCard("hoodies-sweats")}>
+            <div className="cat-card" style={{ background: "url('/hoodies.png')" }} onClick={() => handleSelectCategoryFromCard("hoodies-sweats")}>
               <div className="cat-img-mock">H</div>
               <div className="cat-overlay"></div>
               <div className="cat-info">
@@ -397,7 +410,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#2a1c1c,#120a0a)" }} onClick={() => handleSelectCategoryFromCard("jackets")}>
+            <div className="cat-card" style={{ background: "url('/jacket.png')" }} onClick={() => handleSelectCategoryFromCard("jackets")}>
               <div className="cat-img-mock">J</div>
               <div className="cat-overlay"></div>
               <div className="cat-info">
@@ -406,7 +419,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#1c2a22,#0a120f)" }} onClick={() => handleSelectCategoryFromCard("pants-cargo")}>
+            <div className="cat-card" style={{ background: "url('/pants.png')" }} onClick={() => handleSelectCategoryFromCard("pants-cargo")}>
               <div className="cat-img-mock">P</div>
               <div className="cat-overlay"></div>
               <div className="cat-info">
@@ -415,7 +428,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#1a2235,#0a101a)" }} onClick={() => handleSelectCategoryFromCard("sneakers")}>
+            <div className="cat-card" style={{ background: "url('/sneakers.png')" }} onClick={() => handleSelectCategoryFromCard("sneakers")}>
               <div className="cat-img-mock">S</div>
               <div className="cat-overlay"></div>
               <div className="cat-pill">Premium</div>
@@ -425,7 +438,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="cat-card" style={{ background: "linear-gradient(135deg,#2b2b2b,#111)" }} onClick={() => handleSelectCategoryFromCard("accessories")}>
+            <div className="cat-card" style={{ background: "url('/accessories.png')" }} onClick={() => handleSelectCategoryFromCard("accessories")}>
               <div className="cat-img-mock">A</div>
               <div className="cat-overlay"></div>
               <div className="cat-info">

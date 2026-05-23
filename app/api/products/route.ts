@@ -1,32 +1,49 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
 export const dynamic = "force-dynamic";
-// GET : Récupère tous les produits
+
+// 🔍 GET : Récupère tous les produits (avec désactivation stricte du cache pour l'admin)
 export async function GET() {
   try {
-    // Trié par création décroissante (le plus récent d'abord pour la logique "New Drops")
     const products = await prisma.product.findMany({
       orderBy: { createdAt: "desc" }
     });
 
     return NextResponse.json(products, {
       headers: {
-        "Cache-Control": "no-store, max-age=0, must-revalidate",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     });
   } catch (error) {
+    console.error("Error fetching all products:", error);
     return NextResponse.json({ error: "Erreur serveur de récupération" }, { status: 500 });
   }
 }
 
-// POST : Crée un nouveau produit
+// ➕ POST : Crée un nouveau produit complet (avec gestion des variantes)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, price, stock, isOutOfStock, category, images, gender, collection, sizes } = body;
 
-    // Validation rapide
-    if (!name || !price) {
+    const {
+      name,
+      price,
+      stock,
+      isOutOfStock,
+      category,
+      image,
+      images,
+      gender,
+      collection,
+      sizes,
+      club,
+      variants
+    } = body;
+
+    if (!name || price === undefined || price === null) {
       return NextResponse.json({ error: "Le nom et le prix sont obligatoires" }, { status: 400 });
     }
 
@@ -34,19 +51,22 @@ export async function POST(request: Request) {
       data: {
         name,
         price: Number(price),
-        stock: Number(stock) ?? 0,
+        stock: stock !== undefined ? Number(stock) : 10,
         isOutOfStock: Boolean(isOutOfStock),
-        category,
-        images: images || [],
+        category: category || "jersey",
         gender: gender || "unisex",
+        club: club || "",
         collection: collection || "Essential Drop",
-        sizes: sizes || { S: true, M: true, L: true, XL: true, XXL: true }
+        sizes: sizes || {},
+        variants: variants || [],
+        image: image || null,
+        images: images || [],
       },
     });
 
     return NextResponse.json(newProduct, { status: 201 });
   } catch (error) {
-    console.error("Prisma Error:", error);
+    console.error("Prisma Creation Error:", error);
     return NextResponse.json({ error: "Erreur lors de l'écriture en base de données" }, { status: 500 });
   }
 }

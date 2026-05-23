@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
 export const dynamic = "force-dynamic";
+
 interface RouteParams {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
-// 🔍 GET : Récupérer un produit par son ID
 export async function GET(request: Request, props: RouteParams) {
   try {
-    // Gestion de la compatibilité Next.js pour les params asynchrones
     const params = await props.params;
     const id = Number(params.id);
 
@@ -34,7 +34,6 @@ export async function GET(request: Request, props: RouteParams) {
   }
 }
 
-// ✏️ PUT : Modifier un produit
 export async function PUT(request: Request, props: RouteParams) {
   try {
     const params = await props.params;
@@ -45,15 +44,35 @@ export async function PUT(request: Request, props: RouteParams) {
     }
 
     const body = await request.json();
-    const { name, price, stock, category } = body;
+
+    const {
+      name,
+      price,
+      category,
+      gender,
+      club,
+      sizes,
+      stock,
+      isOutOfStock,
+      variants,
+      image,
+      images
+    } = body;
 
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         name,
         price: Number(price),
-        stock: Number(stock),
         category,
+        gender: gender || "unisex",
+        club: club || "",
+        sizes: sizes || {},
+        stock: Number(stock),
+        isOutOfStock: Boolean(isOutOfStock),
+        variants: variants || [],
+        image: image || null,
+        images: images || [],
       },
     });
 
@@ -67,7 +86,6 @@ export async function PUT(request: Request, props: RouteParams) {
   }
 }
 
-// ❌ DELETE : Supprimer un produit
 export async function DELETE(request: Request, props: RouteParams) {
   try {
     const params = await props.params;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -12,6 +12,15 @@ interface ColorVariant {
   images: string[];
 }
 
+interface ProductForm {
+  name: string;
+  price: string;
+  category: string;
+  gender: string;
+  club: string;
+  sizes: Record<string, boolean>;
+}
+
 export default function NewProduct() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -20,20 +29,19 @@ export default function NewProduct() {
   const initialSizes: Record<string, boolean> = {};
   CLOTHING_SIZES.forEach(sz => { initialSizes[sz] = true; });
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ProductForm>({
     name: "",
     price: "",
     category: "jersey",
     gender: "unisex",
     club: "",
-    sizes: initialSizes as Record<string, boolean>
+    sizes: initialSizes
   });
 
   const [variants, setVariants] = useState<ColorVariant[]>([
-    { color: "Rouge", images: [] }
+    { color: "Standard", images: [] }
   ]);
 
-  // CORRECTION 8 : Gestion du changement de catégorie sans boucle infinie
   function handleCategoryChange(newCategory: string) {
     let updatedSizes: Record<string, boolean> = {};
 
@@ -67,21 +75,25 @@ export default function NewProduct() {
     setVariants(updated);
   }
 
-  // CORRECTION 5 : Rerender React sécurisé avec .map() pour les images
-  function handleImages(e: any, variantIndex: number) {
+  function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
+    if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    files.forEach((file: any) => {
+
+    files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setVariants((prev) =>
-          prev.map((variant, i) => {
-            if (i !== variantIndex) return variant;
-            return {
-              ...variant,
-              images: [...(variant.images || []), reader.result as string]
-            };
-          })
-        );
+        if (typeof reader.result === "string") {
+          const base64String = reader.result;
+          setVariants((prev) =>
+            prev.map((variant, i) => {
+              if (i !== variantIndex) return variant;
+              return {
+                ...variant,
+                images: [...(variant.images || []), base64String]
+              };
+            })
+          );
+        }
       };
       reader.readAsDataURL(file);
     });
@@ -100,21 +112,21 @@ export default function NewProduct() {
   }
 
   function toggleSize(size: string) {
-    setForm((prev: any) => ({
+    setForm((prev) => ({
       ...prev,
       sizes: { ...prev.sizes, [size]: !prev.sizes[size] }
     }));
   }
 
-  async function submit(e: any) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     const hasSizes = Object.keys(form.sizes).length > 0;
     const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
 
-    // CORRECTION 1 : Enregistrement forcé de image et images au payload
-    const firstImageUrl = variants?.[0]?.images?.[0] || null;
+    // Récupération de la première image valide pour la couverture globale
+    const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
 
     const payload = {
       ...form,
@@ -123,7 +135,7 @@ export default function NewProduct() {
       isOutOfStock: isGloballyOutOfStock,
       variants: variants,
       image: firstImageUrl,
-      images: firstImageUrl ? [firstImageUrl] : []
+      images: variants.flatMap(v => v.images || [])
     };
 
     try {
@@ -133,22 +145,28 @@ export default function NewProduct() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Erreur serveur");
+      if (!res.ok) throw new Error("Erreur serveur lors de la création");
 
-      router.push("/admin/products");
+      router.push("/admin");
       router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Une erreur est survenue lors de l'enregistrement.");
+      alert("Une erreur est survenue lors de l'enregistrement du nouveau produit.");
     } finally {
       setLoading(false);
     }
   }
 
+  // Garantit un affichage toujours ordonné des boutons de tailles/pointures
+  const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
+    if (!isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) - Number(b);
+    return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
+  });
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
@@ -191,7 +209,8 @@ export default function NewProduct() {
         .img-preview-box img { width:100%; height:100%; object-fit:cover; }
         .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; }
         .add-photo-trigger { width:68px; height:90px; border:1px dashed var(--gold); display:flex; align-items:center; justify-content:center; color:var(--forest); cursor:pointer; font-size:18px; background:var(--white); }
-        .btn-submit-product { margin-top:40px; background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; width:100%; }
+        .btn-submit-product { margin-top:40px; background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; width:100%; transition: background 0.2s; }
+        .btn-submit-product:hover:not(:disabled) { background: var(--mid); }
         .admin-footer { margin-top:80px; display:flex; justify-content:space-between; align-items:center; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); padding-top:24px; }
         .footer-brand-mark { font-family:'Playfair Display',serif; font-weight:700; color:var(--forest); }
         @media(max-width:768px){ .form-grid { grid-template-columns:1fr; } .sizes-grid { grid-template-columns:repeat(3, 1fr); } }
@@ -203,7 +222,7 @@ export default function NewProduct() {
             <h1>Ajouter un <em>Produit</em></h1>
             <p>Fiche article unifiée avec variantes multiples</p>
           </div>
-          <Link href="/admin/products" className="btn-back">Retour à la Liste</Link>
+          <Link href="/admin" className="btn-back">Retour au Dashboard</Link>
         </header>
 
         <main>
@@ -227,7 +246,6 @@ export default function NewProduct() {
                 />
               </div>
 
-              {/* CORRECTION 9 : select synchronisé sur handleCategoryChange */}
               <div className="form-field">
                 <label>Vestiaire (Catégorie)</label>
                 <select
@@ -269,7 +287,7 @@ export default function NewProduct() {
                   {form.category === "sneakers" ? "Pointures actives pour ce modèle" : "Tailles actives pour ce modèle"}
                 </div>
                 <div className="sizes-grid">
-                  {Object.keys(form.sizes).map((size) => {
+                  {sortedSizes.map((size) => {
                     const isAvailable = form.sizes[size];
                     return (
                       <button
@@ -303,7 +321,7 @@ export default function NewProduct() {
                       <input
                         type="text" required value={v.color}
                         onChange={(e) => handleColorChange(index, e.target.value)}
-                        placeholder="Ex: Rouge (Home), Blanc (Away), Vert..."
+                        placeholder="Ex: Rouge (Home), Blanc (Away), Noir..."
                       />
                     </div>
                     {variants.length > 1 && (
@@ -339,7 +357,7 @@ export default function NewProduct() {
             </div>
 
             <button className="btn-submit-product" disabled={loading}>
-              {loading ? "Enregistrement en cours..." : "Enregistrer le Produit Multi-Variantes"}
+              {loading ? "Enregistrement dans le vestiaire AYVER..." : "Enregistrer le Produit Multi-Variantes"}
             </button>
           </form>
         </main>
