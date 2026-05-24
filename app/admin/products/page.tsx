@@ -3,6 +3,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
@@ -161,7 +162,9 @@ export default function NewProductPage() {
 
   // Maintient un tri logique à l'affichage des tailles / pointures
   const sortedSizes = Object.keys(selectedSizes).sort((a, b) => {
-    if (!isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) - Number(b);
+    if (category === "sneakers") {
+      return Number(a) - Number(b);
+    }
     return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
   });
 
@@ -202,8 +205,8 @@ export default function NewProductPage() {
         .upload-container { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .images-flex { display: flex; flex-wrap: wrap; gap: 12px; }
         .img-preview-box { width: 68px; height: 90px; border: 1px solid #D4CFC8; background: #FAFAF8; overflow: hidden; position: relative; }
-        .img-preview-box img { width: 100%; height: 100%; object-fit: cover; }
-        .btn-del-img { position: absolute; top: 2px; right: 2px; background: rgba(139,32,32,0.85); color: white; border: none; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; }
+        .img-preview-image { object-fit: cover; }
+        .btn-del-img { position: absolute; top: 2px; right: 2px; background: rgba(139,32,32,0.85); color: white; border: none; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; z-index: 4; }
         .add-photo-trigger { width: 68px; height: 90px; border: 1px dashed #C4A882; display: flex; align-items: center; justify-content: center; color: #1A2F1C; cursor: pointer; font-size: 18px; background: #FAFAF8; }
 
         .checkbox-group { flex-direction: row; align-items: center; gap: 10px; margin-top: 10px; }
@@ -358,7 +361,13 @@ export default function NewProductPage() {
                     <div className="images-flex">
                       {v.images.map((img, i) => (
                         <div key={i} className="img-preview-box">
-                          <img src={img} alt="Aperçu déclinaison" />
+                          <Image
+                            src={img}
+                            alt="Aperçu déclinaison"
+                            fill
+                            sizes="68px"
+                            className="img-preview-image"
+                          />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>
                       ))}

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// 🔍 GET : Récupère tous les produits (avec désactivation stricte du cache pour l'admin)
+// 🔍 GET : Récupère tous les produits (sans cache)
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
@@ -23,7 +23,7 @@ export async function GET() {
   }
 }
 
-// ➕ POST : Crée un nouveau produit complet (avec gestion des variantes)
+// ➕ POST : Crée un nouveau produit complet
 export async function POST(request: Request) {
   try {
     const body = await request.json();

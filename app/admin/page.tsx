@@ -22,8 +22,17 @@ export default function AdminDashboardRoot() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
+    try {
+      const res = await fetch("/api/admin/logout", { method: "POST" });
+      if (res.ok) {
+        router.push("/admin/login");
+        router.refresh();
+      } else {
+        alert("Erreur lors de la déconnexion.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -37,7 +46,6 @@ export default function AdminDashboardRoot() {
       });
 
       if (res.ok) {
-        // Rafraîchissement instantané de la liste locale
         setProducts((prev) => prev.filter((p) => p.id !== id));
       } else {
         alert("Une erreur est survenue lors de la tentative de suppression.");
@@ -91,7 +99,6 @@ export default function AdminDashboardRoot() {
       <div className="main-container">
         <div className="panel-header">
           <h1 className="panel-title">Espace Vestiaire Confidentiel</h1>
-          {/* Synchronisation vers ton nouveau fichier unifié */}
           <Link href="/admin/products" className="btn-add">
             + Ajouter un Article
           </Link>
@@ -111,8 +118,6 @@ export default function AdminDashboardRoot() {
           <tbody>
             {products.map((p) => {
               const isOut = p.stock === 0 || p.isOutOfStock;
-
-              // Détection de l'image de couverture principale
               const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
 
               return (

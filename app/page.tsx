@@ -2,18 +2,36 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { addToCart, getCart } from "@/lib/cart";
+import { useRouter } from "next/navigation";
+import { getCart } from "@/lib/cart";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  oldPrice?: number;
+  stock: number;
+  isOutOfStock?: boolean;
+  category?: string;
+  club?: string;
+  images?: string[];
+  sizes?: Record<string, boolean>;
+}
 
 export default function HomePage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const router = useRouter();
+  const [products, setProducts] = useState<Product[]>([]);
   const [cartCount, setCartCount] = useState(0);
-  const [addedProduct, setAddedProduct] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/products")
+    fetch("/api/products", {
+      cache: "no-store",
+    })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setProducts(data.slice(0, 4));
+        if (Array.isArray(data)) {
+          setProducts(data.slice(0, 4));
+        }
       })
       .catch((e) => console.error("Erreur API:", e));
 
@@ -22,24 +40,20 @@ export default function HomePage() {
       const total = cart.reduce((acc, item) => acc + item.qty, 0);
       setCartCount(total);
     };
+
     updateCartCount();
-    const interval = setInterval(updateCartCount, 1000);
-    return () => clearInterval(interval);
+
+    window.addEventListener("storage", updateCartCount);
+
+    return () => {
+      window.removeEventListener("storage", updateCartCount);
+    };
   }, []);
-
-  const handleAddToCart = (e: React.MouseEvent, p: any) => {
-    e.stopPropagation();
-    if (p.stock === 0) return;
-
-    addToCart({ id: p.id, name: p.name, price: p.price, size: "M" });
-    setAddedProduct(p.name);
-    setTimeout(() => setAddedProduct(null), 3000);
-  };
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght@200;300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         :root{
@@ -48,10 +62,6 @@ export default function HomePage() {
         }
         html { scroll-behavior: smooth; }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
-
-        /* TOAST CONFIRMATION PREMIUM */
-        .toast { position:fixed; bottom:30px; right:30px; background:var(--dark); color:var(--white); padding:16px 32px; font-size:11px; letter-spacing:2px; text-transform:uppercase; z-index:1000; transform:translateY(100px); opacity:0; transition:all 0.4s cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid rgba(196,168,130,0.2); }
-        .toast.show { transform:translateY(0); opacity:1; }
 
         /* NAVBAR & ANNOUNCEMENT */
         .announce { background:var(--dark); color:var(--cream); text-align:center; padding:10px 20px; font-size:11px; letter-spacing:2px; font-weight:400; text-transform:uppercase; line-height:1.4; }
@@ -104,8 +114,8 @@ export default function HomePage() {
         .prod-actions { position:absolute; bottom:0; left:0; right:0; transform:translateY(100%); transition:transform .35s ease; z-index:5; }
         .prod-card:not(.is-sold-out):hover .prod-actions { transform:translateY(0); }
 
-        .prod-add { width:100%; padding:14px; background:var(--dark); color:var(--cream); border:none; cursor:pointer; font-family:'Jost',sans-serif; font-size:10px; letter-spacing:2.5px; text-transform:uppercase; font-weight:400; transition:background .2s; }
-        .prod-add:hover { background:var(--forest); }
+        .prod-view { width:100%; padding:14px; background:var(--dark); color:var(--cream); border:none; text-align:center; font-family:'Jost',sans-serif; font-size:10px; letter-spacing:2.5px; text-transform:uppercase; font-weight:400; transition:background .2s; }
+        .prod-view:hover { background:var(--forest); }
 
         .prod-name { font-family:'Playfair Display',serif; font-size:16px; font-weight:600; margin-bottom:6px; color:var(--dark); }
         .prod-club { font-size:11px; color:var(--text-muted); letter-spacing:1.5px; margin-bottom:8px; text-transform:uppercase; }
@@ -140,7 +150,6 @@ export default function HomePage() {
         .btn-footer { border:1px solid rgba(196,168,130,0.3); background:transparent; color:var(--cream); padding:12px 24px; font-size:11px; font-family:'Jost',sans-serif; letter-spacing:2px; text-transform:uppercase; text-decoration:none; transition:all 0.3s; display:inline-flex; align-items:center; gap:8px; }
         .btn-footer:hover { background:var(--cream); color:var(--dark); border-color:var(--cream); }
 
-        /* TABLETTES & ÉCRANS INTERMÉDIAIRES */
         @media(max-width:1100px){
           .products-grid { grid-template-columns: repeat(3, 1fr); gap: 24px; }
           .features-inner { grid-template-columns: repeat(2, 1fr); gap: 32px; }
@@ -155,7 +164,6 @@ export default function HomePage() {
           .footer-links { justify-content: center; width: 100%; }
         }
 
-        /* SMARTPHONES ET PETITS ÉCRANS (OPTIMISATIONS ULTRA-COMPACTES) */
         @media(max-width:640px){
           section { padding: 45px 20px; }
           .announce { font-size: 10px; padding: 8px 12px; }
@@ -170,24 +178,19 @@ export default function HomePage() {
           .price-new { font-size: 13px; }
           .price-old { font-size: 11px; }
           .sizes-preview { display: none; }
-
-          /* SOLUTION ANTIPATERN SPACE : Devient un bandeau glissant horizontal chic et compact */
-          .features { padding: 30px 0 35px 0; overflow-hidden; }
+          .features { padding: 30px 0 35px 0; overflow: hidden; }
           .features-inner {
             display: flex;
             flex-wrap: nowrap;
             overflow-x: auto;
             gap: 24px;
             padding: 0 20px;
-            scroll-linecap: mandatory;
             scroll-snap-type: x mandatory;
             -webkit-overflow-scrolling: touch;
           }
-          /* Masquage discret de la scrollbar sur mobile */
           .features-inner::-webkit-scrollbar { display: none; }
-
           .feat {
-            flex: 0 0 260px; /* Largeur fixe par carte sur mobile pour forcer le swipe */
+            flex: 0 0 260px;
             scroll-snap-align: center;
             background: rgba(255,255,255, 0.02);
             padding: 24px 16px;
@@ -197,20 +200,14 @@ export default function HomePage() {
           }
           .feat-title { font-size: 14px; }
           .feat-text { font-size: 12px; line-height: 1.5; }
-
           .footer-links { flex-direction: column; gap: 12px; }
           .btn-footer { width: 100%; justify-content: center; }
         }
       `}} />
 
-      {/* TOAST NOTIFICATION ARRIVÉE */}
-      <div className={`toast ${addedProduct ? "show" : ""}`}>
-        ✨ Ajouté au Panier : {addedProduct} (Taille M)
-      </div>
-
       {/* ANNOUNCEMENT */}
       <div className="announce">
-        🚚 LIVRAISON GRATUITE AU MAROC — CODE PROMO : AYVER10 POUR -10% SUR VOTRE COMMANDE
+        🚚 LIVRAISON PARTOUT AU MAROC
       </div>
 
       {/* NAVBAR */}
@@ -258,15 +255,24 @@ export default function HomePage() {
         <div className="products-grid">
           {products.length > 0 ? (
             products.map((p) => {
-              const isOut = p.stock === 0;
-              const discount = p.oldPrice ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100) : null;
+              const isOut = p.stock === 0 || p.isOutOfStock;
+              const discount = p.oldPrice && p.oldPrice > p.price ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100) : null;
               const initialLetter = p.name ? p.name.charAt(0) : "A";
+
+              const availableSizes = p.sizes ? Object.keys(p.sizes).filter((s) => p.sizes[s] === true) : [];
 
               return (
                 <div
                   className={`prod-card ${isOut ? 'is-sold-out' : ''}`}
                   key={p.id}
-                  onClick={(e) => handleAddToCart(e, p)}
+                  onClick={() => router.push(`/products/${p.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      router.push(`/products/${p.id}`);
+                    }
+                  }}
                 >
                   <div className="prod-img">
                     {p.images?.[0] ? (
@@ -285,7 +291,7 @@ export default function HomePage() {
 
                     {!isOut && (
                       <div className="prod-actions">
-                        <button className="prod-add">Ajouter au panier</button>
+                        <div className="prod-view">Découvrir l'article</div>
                       </div>
                     )}
                   </div>
@@ -295,24 +301,26 @@ export default function HomePage() {
                     <span className="price-new">{p.price} DH</span>
                     {p.oldPrice && <span className="price-old">{p.oldPrice} DH</span>}
                   </div>
+
                   <div className="sizes-preview">
-                    <span className="size-dot">S</span>
-                    <span className="size-dot">M</span>
-                    <span className="size-dot">L</span>
-                    <span className="size-dot">XL</span>
+                    {availableSizes.length > 0 ? (
+                      availableSizes.map(s => <span key={s} className="size-dot">{s}</span>)
+                    ) : (
+                      <span className="size-dot">TU</span>
+                    )}
                   </div>
                 </div>
               );
             })
           ) : (
-            <p style={{ gridColumn: "span 4", textAlign: "center", color: "var(--text-muted)", fontFamily: "Playfair Display", fontStyle: "italic" }}>
+            <p style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--text-muted)", fontFamily: "Playfair Display", fontStyle: "italic" }}>
               Chargement des dernières arrivées...
             </p>
           )}
         </div>
       </section>
 
-      {/* SECTION INFORMATIONS (Désormais Scrollable Horizontalement et compact sur mobile) */}
+      {/* SECTION INFORMATIONS */}
       <div className="features">
         <div className="features-inner">
           <div className="feat">

@@ -1,44 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, KeyboardEvent, MouseEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { addToCart, getCart } from "@/lib/cart";
+
+// Définition stricte du contrat de données pour éviter les fuites de type "any"
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  category?: string;
+  club?: string;
+  gender?: string;
+  images?: string[];
+  isOutOfStock?: boolean;
+  isNewDrop?: boolean;
+  sizes?: Record<string, boolean>;
+  variants?: Array<{ images?: string[] }>;
+}
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 
 export default function CatalogPage() {
   const router = useRouter();
-  const [products, setProducts] = useState<any[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
-  const [cartCount, setCartCount] = useState(0);
+
+  // États typés avec précision
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cartCount, setCartCount] = useState<number>(0);
   const [addedProduct, setAddedProduct] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'categories' | 'products'>('categories');
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
 
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedGender, setSelectedGender] = useState("all");
-  const [selectedAvailability, setSelectedAvailability] = useState("all");
-  const [selectedSize, setSelectedSize] = useState("M");
-  const [isNewDropOnly, setIsNewDropOnly] = useState(false);
-  const [sortPrice, setSortPrice] = useState("default");
+  const [search, setSearch] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedGender, setSelectedGender] = useState<string>("all");
+  const [selectedAvailability, setSelectedAvailability] = useState<string>("all");
+  const [selectedSize, setSelectedSize] = useState<string>("M");
+  const [isNewDropOnly, setIsNewDropOnly] = useState<boolean>(false);
+  const [sortPrice, setSortPrice] = useState<string>("default");
 
+  // Premier chargement de l'API & écoute réactive globale (Storage Event) pour le compteur de panier
   useEffect(() => {
     fetch("/api/products", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          const processedData = data.map((product, index) => {
-            if (index < 4) {
-              return { ...product, isNewDrop: true };
-            }
-            return product;
-          });
+          const processedData = data.map((product, index) => ({
+            ...product,
+            isNewDrop: index < 4, // Remplacement temporaire avant DB
+          }));
           setProducts(processedData);
-          setFilteredProducts(processedData);
         }
       })
       .catch((e) => console.error("Erreur API:", e));
@@ -47,23 +63,30 @@ export default function CatalogPage() {
       const cart = getCart();
       setCartCount(cart.reduce((acc, item) => acc + item.qty, 0));
     };
+
     updateCartCount();
-    const interval = setInterval(updateCartCount, 1000);
-    return () => clearInterval(interval);
+
+    // Remplacement du setInterval par un event listener cross-tab/runtime synchrone
+    window.addEventListener("storage", updateCartCount);
+    return () => {
+      window.removeEventListener("storage", updateCartCount);
+    };
   }, []);
 
-  useEffect(() => {
+  // Performance & Robustesse : useMemo recalcule la liste uniquement quand un filtre ou un produit change
+  const filteredProducts = useMemo(() => {
     let result = [...products];
 
     if (search) {
+      const searchLower = search.toLowerCase();
       result = result.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.club && p.club.toLowerCase().includes(search.toLowerCase()))
+        (p.name || "").toLowerCase().includes(searchLower) ||
+        (p.club || "").toLowerCase().includes(searchLower)
       );
     }
 
     if (selectedCategory !== "all") {
-      result = result.filter((p) => p.category?.toLowerCase() === selectedCategory.toLowerCase());
+      result = result.filter((p) => (p.category || "").toLowerCase() === selectedCategory.toLowerCase());
     }
 
     if (isNewDropOnly) {
@@ -80,9 +103,11 @@ export default function CatalogPage() {
       result = result.filter((p) => p.stock === 0 || p.isOutOfStock === true);
     }
 
+    // Correction du bug de filtrage : les accessoires passent, le reste doit posséder explicitement la taille
     if (selectedCategory !== "accessories" && selectedSize) {
       result = result.filter((p) => {
-        if (!p.sizes || Object.keys(p.sizes).length === 0) return true;
+        if (p.category?.toLowerCase() === "accessories") return true;
+        if (!p.sizes) return false;
         return p.sizes[selectedSize] === true;
       });
     }
@@ -93,7 +118,7 @@ export default function CatalogPage() {
       result.sort((a, b) => a.price - b.price);
     }
 
-    setFilteredProducts(result);
+    return result;
   }, [search, selectedCategory, isNewDropOnly, selectedGender, selectedAvailability, selectedSize, sortPrice, products]);
 
   const handleSelectCategoryFromCard = (categoryValue: string) => {
@@ -113,7 +138,7 @@ export default function CatalogPage() {
     setViewMode('categories');
   };
 
-  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+  const handleAddToCart = (e: MouseEvent<HTMLButtonElement>, product: Product) => {
     e.stopPropagation();
     if (product.stock === 0 || product.isOutOfStock) return;
 
@@ -127,6 +152,10 @@ export default function CatalogPage() {
       size: finalSize,
       image: displayImage
     } as any);
+
+    // Mettre à jour immédiatement le compteur local suite à l'action
+    const updatedCart = getCart();
+    setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
 
     setAddedProduct(product.name);
     setTimeout(() => setAddedProduct(null), 3000);
@@ -296,10 +325,12 @@ export default function CatalogPage() {
         .products-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; }
         .prod-card { cursor:pointer; text-decoration: none; color: inherit; display: block; }
         .prod-card.is-sold-out { opacity: 0.65; cursor: not-allowed; }
+
+        /* Correction parent container Next.js <Image fill /> */
         .prod-img { aspect-ratio:3/4; background:var(--dark); position:relative; overflow:hidden; margin-bottom:16px; border-radius:2px; }
-        .prod-img img { width:100%; height:100%; object-fit:cover; transition:transform .5s ease; position:absolute; inset:0; z-index:2; }
+        .product-image { object-fit:cover; transition:transform .5s ease; }
         .prod-img-inner { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:clamp(40px,6vw,72px); font-weight:900; color:rgba(255,255,255,.05); font-style:italic; transition:transform .5s ease; }
-        .prod-card:not(.is-sold-out):hover .prod-img img, .prod-card:not(.is-sold-out):hover .prod-img-inner { transform:scale(1.04); }
+        .prod-card:not(.is-sold-out):hover .product-image, .prod-card:not(.is-sold-out):hover .prod-img-inner { transform:scale(1.04); }
 
         .prod-badge { position:absolute; top:12px; left:12px; background:var(--forest); color:var(--cream); font-size:9px; letter-spacing:2px; padding:4px 10px; text-transform:uppercase; z-index:4; }
         .prod-badge.out { background:#8B2020; }
@@ -382,70 +413,33 @@ export default function CatalogPage() {
           </div>
 
           <div className="cat-grid">
-            <div className="cat-card" style={{ background: "url('/jerseys.jpg')" }} onClick={() => handleSelectCategoryFromCard("jersey")}>
-              <div className="cat-img-mock">M</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-pill">Retro</div>
-              <div className="cat-info">
-                <div className="cat-name">Jerseys Officiels</div>
-                <span className="cat-link">Découvrir</span>
+            {[
+              { id: "jersey", label: "Jerseys Officiels", img: "/jerseys.jpg", initial: "M", badge: "Retro" },
+              { id: "T-shirts", label: "T-Shirts Oversize", img: "/tshirtsoversize.png", initial: "T" },
+              { id: "hoodies-sweats", label: "Hoodies & Sweats", img: "/hoodies.png", initial: "H" },
+              { id: "jackets", label: "Jackets & Outerwear", img: "/jacket.png", initial: "J" },
+              { id: "pants-cargo", label: "Cargo & Pants", img: "/pants.png", initial: "P" },
+              { id: "sneakers", label: "Sneakers", img: "/sneakers.png", initial: "S", badge: "Premium" },
+              { id: "accessories", label: "Accessories", img: "/accessories.png", initial: "A" },
+            ].map((cat) => (
+              <div
+                key={cat.id}
+                className="cat-card"
+                style={{ background: `url('${cat.img}')` }}
+                onClick={() => handleSelectCategoryFromCard(cat.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => { if (e.key === "Enter") handleSelectCategoryFromCard(cat.id); }}
+              >
+                <div className="cat-img-mock">{cat.initial}</div>
+                <div className="cat-overlay"></div>
+                {cat.badge && <div className="cat-pill">{cat.badge}</div>}
+                <div className="cat-info">
+                  <div className="cat-name">{cat.label}</div>
+                  <span className="cat-link">Découvrir</span>
+                </div>
               </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/tshirtsoversize.png')" }} onClick={() => handleSelectCategoryFromCard("T-shirts")}>
-              <div className="cat-img-mock">T</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-info">
-                <div className="cat-name">T-Shirts Oversize</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/hoodies.png')" }} onClick={() => handleSelectCategoryFromCard("hoodies-sweats")}>
-              <div className="cat-img-mock">H</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-info">
-                <div className="cat-name">Hoodies & Sweats</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/jacket.png')" }} onClick={() => handleSelectCategoryFromCard("jackets")}>
-              <div className="cat-img-mock">J</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-info">
-                <div className="cat-name">Jackets & Outerwear</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/pants.png')" }} onClick={() => handleSelectCategoryFromCard("pants-cargo")}>
-              <div className="cat-img-mock">P</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-info">
-                <div className="cat-name">Cargo & Pants</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/sneakers.png')" }} onClick={() => handleSelectCategoryFromCard("sneakers")}>
-              <div className="cat-img-mock">S</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-pill">Premium</div>
-              <div className="cat-info">
-                <div className="cat-name">Sneakers</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
-
-            <div className="cat-card" style={{ background: "url('/accessories.png')" }} onClick={() => handleSelectCategoryFromCard("accessories")}>
-              <div className="cat-img-mock">A</div>
-              <div className="cat-overlay"></div>
-              <div className="cat-info">
-                <div className="cat-name">Accessories</div>
-                <span className="cat-link">Découvrir</span>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
       )}
@@ -454,11 +448,13 @@ export default function CatalogPage() {
       {viewMode === 'products' && (
         <div className="shop-container">
 
+          {/* SIDEBAR PC */}
           <aside className="sidebar">
             <h3 className="sidebar-title">Filtres</h3>
             <FilterFilters />
           </aside>
 
+          {/* TIROIR MODAL RESPONSIVE MOBILE ACCESSIBLE */}
           <div className={`mobile-filter-drawer ${isMobileFilterOpen ? "open" : ""}`}>
             <div className="drawer-overlay" onClick={() => setIsMobileFilterOpen(false)}></div>
             <div className="drawer-content">
@@ -482,7 +478,6 @@ export default function CatalogPage() {
                 filteredProducts.map((p) => {
                   const isOut = p.stock === 0 || p.isOutOfStock === true;
                   const initialLetter = p.name ? p.name.charAt(0) : "A";
-
                   const displayImage = p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
 
                   let gradBackground = "linear-gradient(135deg, #1A2F1C 0%, #0A1209 100%)";
@@ -493,17 +488,22 @@ export default function CatalogPage() {
                       className={`prod-card ${isOut ? 'is-sold-out' : ''}`}
                       key={p.id}
                       onClick={() => !isOut && router.push(`/products/${p.id}`)}
+                      role="button"
+                      tabIndex={isOut ? -1 : 0}
+                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                        if (!isOut && e.key === "Enter") router.push(`/products/${p.id}`);
+                      }}
                     >
                       <div className="prod-img" style={{ background: gradBackground }}>
                         <div className="prod-img-inner">{initialLetter}</div>
                         {displayImage && (
-                          <img
+                          <Image
                             src={displayImage}
-                            alt={p.name}
+                            alt={p.name || "Ayver Product"}
+                            fill
+                            sizes="(max-width: 640px) 50vw, (max-width: 900px) 50vw, 33vw"
+                            className="product-image"
                             loading="lazy"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
                           />
                         )}
 
@@ -517,7 +517,7 @@ export default function CatalogPage() {
 
                         {!isOut && (
                           <div className="prod-actions">
-                            <button className="prod-add" onClick={(e) => handleAddToCart(e, p)}>
+                            <button className="prod-add" onClick={(e: MouseEvent<HTMLButtonElement>) => handleAddToCart(e, p)}>
                               Ajouter au panier {p.category === "accessories" ? "" : `(${selectedSize})`}
                             </button>
                           </div>

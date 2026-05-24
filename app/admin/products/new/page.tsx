@@ -3,6 +3,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
@@ -16,7 +17,6 @@ interface ProductForm {
   name: string;
   price: string;
   category: string;
-  gender: string;
   club: string;
   sizes: Record<string, boolean>;
 }
@@ -25,7 +25,6 @@ export default function NewProduct() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // Initialisation par défaut basée sur "jersey"
   const initialSizes: Record<string, boolean> = {};
   CLOTHING_SIZES.forEach(sz => { initialSizes[sz] = true; });
 
@@ -33,7 +32,6 @@ export default function NewProduct() {
     name: "",
     price: "",
     category: "jersey",
-    gender: "unisex",
     club: "",
     sizes: initialSizes
   });
@@ -125,7 +123,6 @@ export default function NewProduct() {
     const hasSizes = Object.keys(form.sizes).length > 0;
     const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
 
-    // Récupération de la première image valide pour la couverture globale
     const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
 
     const payload = {
@@ -157,9 +154,11 @@ export default function NewProduct() {
     }
   }
 
-  // Garantit un affichage toujours ordonné des boutons de tailles/pointures
+  // Tri sécurisé et typé pour les grilles d'affichage
   const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
-    if (!isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) - Number(b);
+    if (form.category === "sneakers") {
+      return Number(a) - Number(b);
+    }
     return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
   });
 
@@ -203,11 +202,10 @@ export default function NewProduct() {
         .size-out-of-stock .size-label { color: var(--text-muted); text-decoration: line-through; }
         .size-out-of-stock .status-indicator { color: var(--danger); }
         .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
-        .upload-label { font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); }
         .images-flex { display:flex; flex-wrap:wrap; gap:12px; }
         .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; }
-        .img-preview-box img { width:100%; height:100%; object-fit:cover; }
-        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; }
+        .img-preview-image { object-fit:cover; }
+        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:4; }
         .add-photo-trigger { width:68px; height:90px; border:1px dashed var(--gold); display:flex; align-items:center; justify-content:center; color:var(--forest); cursor:pointer; font-size:18px; background:var(--white); }
         .btn-submit-product { margin-top:40px; background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; width:100%; transition: background 0.2s; }
         .btn-submit-product:hover:not(:disabled) { background: var(--mid); }
@@ -270,15 +268,6 @@ export default function NewProduct() {
                   placeholder="Ex: Espagne, Casablanca, Nike"
                 />
               </div>
-
-              <div className="form-field">
-                <label>Ligne (Genre)</label>
-                <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-                  <option value="unisex">Unisex</option>
-                  <option value="men">Homme</option>
-                  <option value="women">Femme</option>
-                </select>
-              </div>
             </div>
 
             {form.category !== "accessories" ? (
@@ -336,7 +325,13 @@ export default function NewProduct() {
                     <div className="images-flex">
                       {v.images.map((img, i) => (
                         <div key={i} className="img-preview-box">
-                          <img src={img} alt="Aperçu déclinaison" />
+                          <Image
+                            src={img}
+                            alt="Aperçu déclinaison"
+                            fill
+                            sizes="68px"
+                            className="img-preview-image"
+                          />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>
                       ))}

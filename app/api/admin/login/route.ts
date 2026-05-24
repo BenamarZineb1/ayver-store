@@ -12,10 +12,10 @@ export async function POST(request: Request) {
 
       // Configuration du cookie de session sécurisé
       response.cookies.set("admin_session", "authenticated_ayver", {
-        httpOnly: true, // Empêche l'accès via JavaScript (protection XSS)
-        secure: process.env.NODE_ENV === "production", // HTTPS uniquement en prod
-        sameSite: "strict", // Protection contre les failles CSRF
-        maxAge: 60 * 60 * 24, // Session active pendant 24 heures
+        httpOnly: true, // Protège contre les failles XSS
+        secure: process.env.NODE_ENV === "production", // HTTPS uniquement en production
+        sameSite: "strict", // Protection contre le CSRF
+        maxAge: 60 * 60 * 24, // Session active 24h
         path: "/",
       });
 

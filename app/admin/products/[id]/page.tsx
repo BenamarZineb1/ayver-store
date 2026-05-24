@@ -3,6 +3,7 @@
 import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
@@ -16,7 +17,6 @@ interface ProductForm {
   name: string;
   price: string;
   category: string;
-  gender: string;
   club: string;
   sizes: Record<string, boolean>;
 }
@@ -24,7 +24,9 @@ interface ProductForm {
 export default function EditProduct() {
   const router = useRouter();
   const params = useParams();
-  const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : null;
+
+  // Extraction sécurisée et robuste de l'ID des paramètres d'URL
+  const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params?.id[0] : null;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +35,6 @@ export default function EditProduct() {
     name: "",
     price: "",
     category: "jersey",
-    gender: "unisex",
     club: "",
     sizes: {}
   });
@@ -44,12 +45,15 @@ export default function EditProduct() {
     if (!id) return;
 
     fetch(`/api/products/${id}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Impossible de charger la fiche produit");
+        return res.json();
+      })
       .then((data) => {
         if (data.error) throw new Error(data.error);
 
         const productCategory = data.category || "jersey";
-        let productSizes = { ...(data.sizes || {}) };
+        const productSizes: Record<string, boolean> = { ...(data.sizes || {}) };
 
         if (Object.keys(productSizes).length === 0 && productCategory !== "accessories") {
           const targetGrid = productCategory === "sneakers" ? SNEAKER_SIZES : CLOTHING_SIZES;
@@ -60,7 +64,6 @@ export default function EditProduct() {
           name: data.name || "",
           price: data.price ? String(data.price) : "",
           category: productCategory,
-          gender: data.gender || "unisex",
           club: data.club || "",
           sizes: productSizes,
         });
@@ -214,7 +217,9 @@ export default function EditProduct() {
   }
 
   const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
-    if (!isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) - Number(b);
+    if (form.category === "sneakers") {
+      return Number(a) - Number(b);
+    }
     return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
   });
 
@@ -261,8 +266,8 @@ export default function EditProduct() {
         .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
         .images-flex { display:flex; flex-wrap:wrap; gap:12px; }
         .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; }
-        .img-preview-box img { width:100%; height:100%; object-fit:cover; }
-        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; }
+        .img-preview-image { object-fit:cover; }
+        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:4; }
         .add-photo-trigger { width:68px; height:90px; border:1px dashed var(--gold); display:flex; align-items:center; justify-content:center; color:var(--forest); cursor:pointer; font-size:18px; background:var(--white); }
         .form-actions-bar { margin-top:40px; display:flex; gap:16px; border-top:1px dashed var(--border); padding-top:24px; }
         .btn-submit-product { background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; flex:2; font-weight:500; }
@@ -304,7 +309,10 @@ export default function EditProduct() {
 
               <div className="form-field">
                 <label>Vestiaire (Catégorie)</label>
-                <select value={form.category} onChange={(e) => handleCategoryChange(e.target.value)}>
+                <select
+                  value={form.category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                >
                   <option value="jersey">Jerseys Officiels</option>
                   <option value="T-shirts">T-shirts Oversize</option>
                   <option value="hoodies-sweats">Hoodies & Sweatshirts</option>
@@ -322,21 +330,12 @@ export default function EditProduct() {
                   onChange={(e) => setForm({ ...form, club: e.target.value })}
                 />
               </div>
-
-              <div className="form-field">
-                <label>Ligne (Genre)</label>
-                <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-                  <option value="unisex">Unisex</option>
-                  <option value="men">Homme</option>
-                  <option value="women">Femme</option>
-                </select>
-              </div>
             </div>
 
             {form.category !== "accessories" ? (
               <div className="sizes-section">
                 <div className="sizes-title">
-                  {form.category === "sneakers" ? "Modifier l'état des Pointures" : "Modifier l'état des Tailles"}
+                  {form.category === "sneakers" ? "Pointures actives pour ce modèle" : "Tailles actives pour ce modèle"}
                 </div>
                 <div className="sizes-grid">
                   {sortedSizes.map((size) => {
@@ -348,7 +347,9 @@ export default function EditProduct() {
                         onClick={() => toggleSize(size)}
                       >
                         <span className="size-label">{size}</span>
-                        <span className="status-indicator">{isAvailable ? "Dispo ✓" : "Bloqué ✕"}</span>
+                        <span className="status-indicator">
+                          {isAvailable ? "Dispo ✓" : "Bloqué ✕"}
+                        </span>
                       </button>
                     );
                   })}
@@ -356,12 +357,12 @@ export default function EditProduct() {
               </div>
             ) : (
               <div className="sizes-section" style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>
-                ✨ <strong>Mode Accessoires actif :</strong> Cet article ne dépend d'aucune grille de taille (Taille unique).
+                ✨ <strong>Mode Accessoires :</strong> Cet article sera configuré en taille unique.
               </div>
             )}
 
             <div className="variants-section">
-              <div className="section-subtitle">Variantes de couleurs & Galeries photos associées</div>
+              <div className="section-subtitle">Variantes de couleurs & Galeries photos dédiées</div>
 
               {variants.map((v, index) => (
                 <div key={index} className="variant-card">
@@ -375,7 +376,7 @@ export default function EditProduct() {
                     </div>
                     {variants.length > 1 && (
                       <button type="button" className="btn-remove-variant" onClick={() => removeVariant(index)}>
-                        Supprimer la variante
+                        Supprimer
                       </button>
                     )}
                   </div>
@@ -383,9 +384,15 @@ export default function EditProduct() {
                   <div className="upload-container">
                     <span className="upload-label">Photos de la variante ({v.color || `n°${index + 1}`}) :</span>
                     <div className="images-flex">
-                      {v.images && v.images.map((img, i) => (
+                      {v.images.map((img, i) => (
                         <div key={i} className="img-preview-box">
-                          <img src={img} alt="Aperçu déclinaison" />
+                          <Image
+                            src={img}
+                            alt="Aperçu déclinaison"
+                            fill
+                            sizes="68px"
+                            className="img-preview-image"
+                          />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>
                       ))}
@@ -401,18 +408,23 @@ export default function EditProduct() {
               ))}
 
               <button type="button" className="btn-add-variant" onClick={addVariant}>
-                + Ajouter une autre déclinaison de couleur pour ce modèle
+                + Ajouter une autre couleur / option pour ce produit
               </button>
             </div>
 
             <div className="form-actions-bar">
-              <button className="btn-submit-product" disabled={submitting}>
-                {submitting ? "Mise à jour en cours..." : "Enregistrer les modifications"}
-              </button>
               <Link href="/admin" className="btn-cancel">Annuler</Link>
+              <button className="btn-submit-product" disabled={submitting}>
+                {submitting ? "Mise à jour dans l'atelier..." : "Mettre à jour le Produit"}
+              </button>
             </div>
           </form>
         </main>
+
+        <footer className="admin-footer">
+          <div>Panneau d'Administration Sécurisé Mark II</div>
+          <div>AYVER 2026</div>
+        </footer>
       </div>
     </>
   );

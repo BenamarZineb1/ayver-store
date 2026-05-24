@@ -1,16 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, MouseEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { addToCart, getCart } from "@/lib/cart";
+
+// Contrat d'interface strict pour le produit et ses variantes
+interface Variant {
+  color?: string;
+  images?: string[];
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  oldPrice?: number;
+  stock: number;
+  category?: string;
+  club?: string;
+  description?: string;
+  image?: string;
+  images?: string[];
+  isOutOfStock?: boolean;
+  sizes?: Record<string, boolean>;
+  variants?: Variant[];
+}
 
 export default function ProductPage() {
   const { id } = useParams();
-  const [product, setProduct] = useState<any>(null);
-  const [size, setSize] = useState("");
-  const [activeImage, setActiveImage] = useState("");
-  const [cartCount, setCartCount] = useState(0);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [size, setSize] = useState<string>("");
+  const [activeImage, setActiveImage] = useState<string>("");
+  const [cartCount, setCartCount] = useState<number>(0);
   const [addedProduct, setAddedProduct] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,16 +41,20 @@ export default function ProductPage() {
 
     fetch(`/api/products/${id}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: Product) => {
         setProduct(data);
 
-        // Définir la première image active disponible
-        const firstImg = data.images?.[0] || data.image || data.variants?.find((v: any) => v.images?.length > 0)?.images?.[0] || "/placeholder.jpg";
+        // Définir la première image active disponible de manière sécurisée
+        const firstImg =
+          data.images?.[0] ||
+          data.image ||
+          data.variants?.find((v) => (v.images?.length ?? 0) > 0)?.images?.[0] ||
+          "/placeholder.jpg";
         setActiveImage(firstImg);
 
-        // Sélectionner automatiquement la première taille disponible cochée à true
+        // Sélection automatique de la première taille disponible cochée à true
         if (data.sizes && Object.keys(data.sizes).length > 0) {
-          const availableSizes = Object.keys(data.sizes).filter((s) => data.sizes[s] === true);
+          const availableSizes = Object.keys(data.sizes).filter((s) => data.sizes?.[s] === true);
           if (availableSizes.length > 0) {
             setSize(availableSizes[0]);
           } else {
@@ -43,29 +70,36 @@ export default function ProductPage() {
       const cart = getCart();
       setCartCount(cart.reduce((acc, item) => acc + item.qty, 0));
     };
+
     updateCartCount();
-    const interval = setInterval(updateCartCount, 1000);
-    return () => clearInterval(interval);
+
+    // Remplacement du setInterval par un EventListener Storage natif et propre
+    window.addEventListener("storage", updateCartCount);
+    return () => {
+      window.removeEventListener("storage", updateCartCount);
+    };
   }, [id]);
 
   const handleAddToCart = () => {
     if (!product) return;
 
-    // Inclusion cruciale de l'image sélectionnée pour le rendu du panier
     addToCart({
       id: product.id,
       name: product.name,
       price: product.price,
       size: size,
-      image: activeImage // Transmet l'image exacte au local storage du panier
+      image: activeImage
     } as any);
+
+    // Synchronisation synchrone immédiate du compteur après ajout
+    const updatedCart = getCart();
+    setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
 
     setAddedProduct(product.name);
     setTimeout(() => setAddedProduct(null), 3000);
   };
 
-  // Switcher d'image lorsqu'on sélectionne explicitement une déclinaison de couleur
-  const handleVariantSelect = (variantImages: string[]) => {
+  const handleVariantSelect = (variantImages?: string[]) => {
     if (variantImages && variantImages.length > 0) {
       setActiveImage(variantImages[0]);
     }
@@ -88,12 +122,12 @@ export default function ProductPage() {
   const isGloballyOut = product.stock === 0 || product.isOutOfStock;
 
   const activeSizesList = product.sizes
-    ? Object.keys(product.sizes).filter((s) => product.sizes[s] === true)
+    ? Object.keys(product.sizes).filter((s) => product.sizes?.[s] === true)
     : [];
 
   const allImages: string[] = [
     ...(product.images || []),
-    ...(product.variants?.flatMap((v: any) => v.images || []) || [])
+    ...(product.variants?.flatMap((v) => v.images || []) || [])
   ].filter((img, index, self) => img && self.indexOf(img) === index);
 
   return (
@@ -124,17 +158,17 @@ export default function ProductPage() {
         .product-container { max-width:1200px; margin:0 auto; padding:60px 40px 100px 40px; }
         .product-layout { display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; align-items:start; }
 
-        /* GALERIE */
+        /* GALERIE AVEC FIX POUR COMPOSANT NEXT.JS IMAGE FILL */
         .gallery-wrapper { display:flex; flex-direction:column; gap:16px; }
         .image-box { background:var(--dark); display:flex; align-items:center; justify-content:center; aspect-ratio:3/4; overflow:hidden; border-radius:2px; position:relative; }
-        .image-box img { width:100%; height:100%; object-fit:cover; }
+        .main-product-image { object-fit:cover; }
         .image-placeholder { font-family:'Playfair Display',serif; font-size:120px; font-weight:900; color:rgba(255,255,255,0.04); font-style:italic; position:absolute; }
         .image-letter-front { font-family:'Playfair Display',serif; font-size:72px; font-weight:700; color:var(--cream); font-style:italic; z-index:2; }
 
         .thumbs-grid { display:flex; gap:10px; flex-wrap:wrap; }
-        .thumb-nav { width:60px; height:80px; border:1px solid var(--border); background:var(--white); cursor:pointer; overflow:hidden; opacity:0.6; transition:all 0.2s; }
+        .thumb-nav { width:60px; height:80px; border:1px solid var(--border); background:var(--white); cursor:pointer; overflow:hidden; opacity:0.6; transition:all 0.2s; position:relative; }
         .thumb-nav.active, .thumb-nav:hover { opacity:1; border-color:var(--dark); }
-        .thumb-nav img { width:100%; height:100%; object-fit:cover; }
+        .thumb-image { object-fit:cover; }
 
         .prod-badge { position:absolute; top:20px; left:20px; background:var(--forest); color:var(--cream); font-size:9px; letter-spacing:2px; padding:6px 14px; text-transform:uppercase; z-index:3; }
         .prod-badge.sale { background:#8B2020; }
@@ -150,7 +184,6 @@ export default function ProductPage() {
         .stock-tag { font-size:11px; font-weight:500; color:var(--forest); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:24px; display:inline-flex; align-items:center; }
         .stock-tag.out { color:var(--danger); }
 
-        /* BLOC VARIANTES DE COULEURS VIA BACKEND */
         .variant-section { margin-bottom:24px; border-top: 1px solid var(--border); padding-top: 20px; }
         .variant-grid { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
         .variant-pill { padding: 6px 14px; border: 1px solid var(--border); background: var(--white); font-size: 12px; cursor: pointer; font-family: 'Jost', sans-serif; transition: all 0.2s; text-transform: capitalize; }
@@ -169,7 +202,6 @@ export default function ProductPage() {
 
         .product-desc { font-size:14px; color:var(--dark); opacity:0.8; line-height:1.7; border-top:1px solid var(--border); padding-top:28px; }
 
-        /* FEATURES & FOOTER */
         .features { background:var(--dark); padding:80px 60px; }
         .features-inner { max-width:1300px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:40px; }
         .feat { display:flex; flex-direction:column; align-items:center; text-align:center; gap:16px; }
@@ -219,18 +251,18 @@ export default function ProductPage() {
       <div className="product-container">
         <div className="product-layout">
 
-          {/* GALERIE D'IMAGES */}
+          {/* GALERIE D'IMAGES COMPATIBLE NEXT.JS */}
           <div className="gallery-wrapper">
             <div className="image-box">
               <div className="image-placeholder">{initialLetter}</div>
               {activeImage ? (
-                <img
+                <Image
                   src={activeImage}
-                  alt={product.name}
-                  loading="eager"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = "/placeholder.jpg";
-                  }}
+                  alt={product.name || "Ayver Premium Custom"}
+                  fill
+                  priority
+                  sizes="(max-width: 900px) 100vw, 55vw"
+                  className="main-product-image"
                 />
               ) : (
                 <span className="image-letter-front">{initialLetter}</span>
@@ -254,12 +286,12 @@ export default function ProductPage() {
                     onClick={() => setActiveImage(img)}
                     onMouseEnter={() => setActiveImage(img)}
                   >
-                    <img
+                    <Image
                       src={img}
                       alt={`Miniature ${i + 1}`}
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = "/placeholder.jpg";
-                      }}
+                      fill
+                      sizes="60px"
+                      className="thumb-image"
                     />
                   </button>
                 ))}
@@ -281,12 +313,12 @@ export default function ProductPage() {
               {!isGloballyOut ? "✓ Pièce disponible en stock" : "✕ Édition archivée / épuisée"}
             </div>
 
-            {/* INTERACTION DES VARIANTES DE COULEURS */}
+            {/* VARIANTES DE COULEURS */}
             {product.variants && product.variants.length > 0 && (
               <div className="variant-section">
                 <p className="size-label">Couleurs & Déclinaisons</p>
                 <div className="variant-grid">
-                  {product.variants.map((v: any, index: number) => (
+                  {product.variants.map((v, index) => (
                     <button
                       key={index}
                       className="variant-pill"
@@ -336,7 +368,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* BLOC ATTRIBUTS MAISON */}
+      {/* ATTRIBUTS DE MARQUE */}
       <div className="features">
         <div className="features-inner">
           <div className="feat">

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { getCart, removeFromCart, CartItem } from "@/lib/cart";
 
 export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartCount, setCartCount] = useState(0);
+  const [cartCount, setCartCount] = useState<number>(0);
 
   const updateCartState = () => {
     const currentCart = getCart();
@@ -16,12 +17,15 @@ export default function CartPage() {
 
   useEffect(() => {
     updateCartState();
-    // Rafraîchissement automatique pour garder une synchro parfaite
-    const interval = setInterval(updateCartState, 1000);
-    return () => clearInterval(interval);
+
+    // Remplacement du rafraîchissement par intervalle par un écouteur d'événement natif et performant
+    window.addEventListener("storage", updateCartState);
+    return () => {
+      window.removeEventListener("storage", updateCartState);
+    };
   }, []);
 
-  function handleRemove(id: any) {
+  function handleRemove(id: string | number) {
     removeFromCart(id);
     updateCartState();
   }
@@ -87,7 +91,7 @@ export default function CartPage() {
         .cart-item { display: flex; gap: 20px; padding: 20px; background: var(--white); border: 1px solid var(--border); border-radius: 2px; align-items: center; }
 
         .item-img-box { width: 75px; height: 100px; background: var(--dark); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .item-img-box img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; z-index: 3; }
+        .cart-item-image { object-fit: cover; z-index: 3; }
         .item-img-inner { font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 900; color: rgba(255,255,255,0.05); font-style: italic; position: absolute; z-index: 1; }
         .item-letter { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.2); font-style: italic; z-index: 2; }
 
@@ -169,20 +173,20 @@ export default function CartPage() {
             <div className="cart-list">
               {cart.map((item) => {
                 const letter = item.name ? item.name.charAt(0) : "A";
-                // Récupération sécurisée du visuel produit stocké dans l'item du panier
-                const itemImage = (item as any).image || "/placeholder.jpg";
+                const itemImage = item.image || "/placeholder.jpg";
 
                 return (
-                  <div key={item.id} className="cart-item">
+                  <div key={`${item.id}-${item.size || "default"}`} className="cart-item">
                     <div className="item-img-box">
                       <div className="item-img-inner">{letter}</div>
                       <span className="item-letter">{letter}</span>
-                      <img
+                      <Image
                         src={itemImage}
-                        alt={item.name}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = "/placeholder.jpg";
-                        }}
+                        alt={item.name || "Visuel produit"}
+                        fill
+                        sizes="75px"
+                        className="cart-item-image"
+                        priority
                       />
                     </div>
 
