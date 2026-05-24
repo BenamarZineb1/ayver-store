@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
 
   // Détecter si la requête passe par le sous-domaine admin
-  const isAdminSubdomain = host.startsWith("admin.");
+  const isAdminSubdomain = host.startsWith("admin-");
 
   // 1. Un client sur le site principal tente d'accéder à l'admin -> Masquage (404)
   if (!isAdminSubdomain && url.pathname.startsWith("/admin")) {
