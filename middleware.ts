@@ -9,28 +9,27 @@ export function middleware(request: NextRequest) {
   const isAdminSubdomain = host.startsWith("admin.");
 
   // 1. Un client sur le site principal tente d'accéder à l'admin -> Masquage (404)
-  if (!isAdminSubdomain && (url.pathname.startsWith("/admin") || url.pathname.startsWith("/admin/login"))) {
+  if (!isAdminSubdomain && url.pathname.startsWith("/admin")) {
     return NextResponse.rewrite(new URL("/404", request.url));
   }
 
   // 2. Traitement du sous-domaine admin.ayver-store...
   if (isAdminSubdomain) {
     const adminToken = request.cookies.get("admin_session")?.value;
+    const isAuthenticated = adminToken === "authenticated_ayver";
 
     // Si l'admin arrive sur la racine du sous-domaine "admin.ayver-store.com/"
     if (url.pathname === "/") {
-      if (adminToken === "authenticated_ayver") {
-        url.pathname = "/admin"; // Redirige vers son tableau de bord
-      } else {
-        url.pathname = "/admin/login"; // Redirige vers sa page de connexion
-      }
+      url.pathname = isAuthenticated ? "/admin" : "/admin/login";
       return NextResponse.rewrite(url);
     }
 
-    // Protection des routes internes de l'administration
-    if (url.pathname.startsWith("/admin") && url.pathname !== "/admin/login") {
-      if (adminToken !== "authenticated_ayver") {
-        return NextResponse.redirect(new URL("/", request.url)); // Renvoie à la racine du sous-domaine (qui affichera le login)
+    // Protection des routes internes de l'administration (Sauf la page de login elle-même)
+    if (url.pathname.startsWith("/admin") && !url.pathname.startsWith("/admin/login")) {
+      if (!isAuthenticated) {
+        // Au lieu d'un redirect brutal qui peut casser le sous-domaine, on réécrit vers le login
+        url.pathname = "/admin/login";
+        return NextResponse.rewrite(url);
       }
     }
   }
