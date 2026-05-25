@@ -34,8 +34,6 @@ export async function POST(request: Request) {
       stock,
       isOutOfStock,
       category,
-      image,
-      images,
       gender,
       collection,
       sizes,
@@ -46,6 +44,15 @@ export async function POST(request: Request) {
     if (!name || price === undefined || price === null) {
       return NextResponse.json({ error: "Le nom et le prix sont obligatoires" }, { status: 400 });
     }
+
+    // 🛠️ CORRECTIF CRUCIAL : Ton admin envoie [[{color, images}]], on le transforme en [{color, images}]
+    let cleanVariants = variants || [];
+    if (Array.isArray(cleanVariants[0])) {
+      cleanVariants = cleanVariants.flat();
+    }
+
+    // Extraction de toutes les images pour remplir aussi le champ images[] de base si tu veux s'en servir
+    const allImages = cleanVariants.flatMap((v: any) => v.images || []);
 
     const newProduct = await prisma.product.create({
       data: {
@@ -58,9 +65,8 @@ export async function POST(request: Request) {
         club: club || "",
         collection: collection || "Essential Drop",
         sizes: sizes || {},
-        variants: variants || [],
-        image: image || null,
-        images: images || [],
+        images: allImages,       // Stocke un tableau à plat de toutes les chaînes Base64
+        variants: cleanVariants, // Stocke la structure complète [{color: "...", images: [...]}] dans le JSON
       },
     });
 

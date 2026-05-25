@@ -7,6 +7,7 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+// 🔍 GET : Récupère un produit unique par son ID
 export async function GET(request: Request, props: RouteParams) {
   try {
     const params = await props.params;
@@ -34,6 +35,7 @@ export async function GET(request: Request, props: RouteParams) {
   }
 }
 
+// 📝 PUT : Met à jour un produit existant (Nettoyé pour le JSON et sécurisé)
 export async function PUT(request: Request, props: RouteParams) {
   try {
     const params = await props.params;
@@ -55,24 +57,32 @@ export async function PUT(request: Request, props: RouteParams) {
       stock,
       isOutOfStock,
       variants,
-      image,
-      images
+      collection // Ajouté si jamais tu modifies aussi la collection
     } = body;
+
+    // 🛠️ CORRECTIF : On aplatit le tableau si l'admin envoie des variants doublement imbriqués [[...]]
+    let cleanVariants = variants || [];
+    if (Array.isArray(cleanVariants[0])) {
+      cleanVariants = cleanVariants.flat();
+    }
+
+    // Extraction de toutes les images pour mettre à jour le tableau images[] global
+    const allImages = cleanVariants.flatMap((v: any) => v.images || []);
 
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         name,
-        price: Number(price),
+        price: price !== undefined ? Number(price) : undefined,
         category,
         gender: gender || "unisex",
         club: club || "",
+        collection: collection || undefined,
         sizes: sizes || {},
-        stock: Number(stock),
-        isOutOfStock: Boolean(isOutOfStock),
-        variants: variants || [],
-        image: image || null,
-        images: images || [],
+        stock: stock !== undefined ? Number(stock) : undefined,
+        isOutOfStock: isOutOfStock !== undefined ? Boolean(isOutOfStock) : undefined,
+        images: allImages,       // Met à jour la liste plate d'images globales
+        variants: cleanVariants, // Écrit la structure propre [{color: "...", images: [...]}] dans le champ JSON
       },
     });
 
@@ -86,6 +96,7 @@ export async function PUT(request: Request, props: RouteParams) {
   }
 }
 
+// ❌ DELETE : Supprime un produit par son ID
 export async function DELETE(request: Request, props: RouteParams) {
   try {
     const params = await props.params;
