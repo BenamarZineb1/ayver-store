@@ -14,8 +14,9 @@ export default function AdminDashboardRoot() {
     setErrorMsg(null);
     fetch("/api/products", { cache: "no-store" })
       .then((res) => {
+        // Si la session a expiré en tâche de fond, redirection vers le login
         if (res.status === 401 || res.status === 403) {
-          router.push("/admin/login");
+          window.location.href = "/admin/login";
           return null;
         }
         if (!res.ok) throw new Error("Impossible de charger les articles.");
@@ -45,7 +46,8 @@ export default function AdminDashboardRoot() {
     try {
       const res = await fetch("/api/admin/logout", { method: "POST" });
       if (res.ok) {
-        router.push("/admin/login");
+        // Force un rechargement complet vers le login pour détruire proprement l'état local
+        window.location.href = "/admin/login";
       } else {
         alert("Erreur lors de la déconnexion.");
       }
@@ -79,7 +81,7 @@ export default function AdminDashboardRoot() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Jost:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Jost:wght=300;400;500;600&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 

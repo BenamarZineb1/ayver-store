@@ -26,9 +26,9 @@ export default function AdminLogin() {
         throw new Error(data.error || "Identifiants invalides ou erreur serveur");
       }
 
-      // 🟢 FIX DE SÉCURITÉ CRITIQUE : force un rechargement complet de la page vers /admin
-      // pour que le middleware lise instantanément le nouveau cookie enregistré.
-      window.location.href = "/admin";
+      // 🟢 REDIRECTION CORRIGÉE : Force un rechargement complet vers la racine du domaine
+      // C'est à la racine ("/") que le middleware va détecter le cookie et faire le rewrite magique.
+      window.location.href = "/";
     } catch (err: any) {
       setError(err.message);
     } finally {
