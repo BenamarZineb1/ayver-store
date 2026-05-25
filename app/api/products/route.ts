@@ -23,7 +23,7 @@ export async function GET() {
   }
 }
 
-// ➕ POST : Crée un nouveau produit complet
+// ➕ POST : Crée un nouveau produit complet (Version nettoyée)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -39,14 +39,14 @@ export async function POST(request: Request) {
       gender,
       collection,
       sizes,
-      club,
-      variants
+      club
     } = body;
 
     if (!name || price === undefined || price === null) {
       return NextResponse.json({ error: "Le nom et le prix sont obligatoires" }, { status: 400 });
     }
 
+    // 🟢 Création propre sans le champ 'variants' qui faisait planter Prisma
     const newProduct = await prisma.product.create({
       data: {
         name,
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
         club: club || "",
         collection: collection || "Essential Drop",
         sizes: sizes || {},
-        variants: variants || [],
         image: image || null,
         images: images || [],
       },
