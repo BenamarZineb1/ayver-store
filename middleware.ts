@@ -46,7 +46,7 @@ export function middleware(request: NextRequest) {
   } else {
     // 🔵 CAS PRODUCTION : SITE PRINCIPAL (Clients)
     // Si un client lambda tente de taper "/admin" sur le site public -> Masquage total (404)
-    if (pathname.startsWith("/admin") {
+    if (pathname.startsWith("/admin")) {
       return NextResponse.rewrite(new URL("/404", request.url));
     }
   }
