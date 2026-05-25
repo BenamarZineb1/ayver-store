@@ -249,7 +249,7 @@ export default function EditProduct() {
         .admin-container {
           max-width:1000px;
           margin:0 auto;
-          padding:40px 20px 80px 20px;
+          padding:24px 16px 80px 16px;
           min-height:100vh;
           min-height:100dvh;
           display:flex;
@@ -275,23 +275,26 @@ export default function EditProduct() {
           .admin-header { flex-direction: row; justify-content:space-between; align-items:flex-end; margin-bottom:50px; padding-bottom:24px; }
         }
 
-        .admin-header h1 { font-family:'Playfair Display',serif; font-size:32px; font-weight:700; color:var(--dark); line-height: 1.2; }
+        .admin-header h1 { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; color:var(--dark); line-height: 1.2; }
 
         @media(min-width: 768px) {
           .admin-header h1 { font-size:42px; }
         }
 
         .admin-header h1 em { font-style:italic; font-weight:400; color:var(--forest); }
-        .admin-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+        .admin-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
         .header-actions { display:flex; gap:10px; width: 100%; justify-content: flex-start; }
         @media(min-width: 600px) { .header-actions { width: auto; justify-content: flex-end; } }
 
-        .btn-back { font-size:11px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; color:var(--text-muted); border:1px solid var(--border); padding:10px 20px; background:var(--white); transition:all 0.3s; font-weight:500; text-align: center; }
-        .btn-delete-top { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--danger); border:1px solid var(--danger); padding:10px 20px; background:transparent; transition:all 0.3s; font-weight:500; cursor:pointer; text-align: center; }
+        .btn-back { font-size:11px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; color:var(--text-muted); border:1px solid var(--border); padding:10px 20px; background:var(--white); transition:all 0.3s; font-weight:500; text-align: center; flex: 1; }
+        @media(min-width: 600px) { .btn-back { flex: none; } }
+
+        .btn-delete-top { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--danger); border:1px solid var(--danger); padding:10px 20px; background:transparent; transition:all 0.3s; font-weight:500; cursor:pointer; text-align: center; flex: 1; -webkit-appearance: none; }
+        @media(min-width: 600px) { .btn-delete-top { flex: none; } }
         .btn-delete-top:hover { background:var(--danger); color:var(--white); }
 
-        .form-surface { background:var(--white); border:1px solid var(--border); padding:24px; border-radius:2px; }
+        .form-surface { background:var(--white); border:1px solid var(--border); padding:20px 16px; border-radius:2px; }
         @media(min-width: 768px) { .form-surface { padding:40px; } }
 
         .form-grid { display:grid; grid-template-columns:1fr; gap:20px; }
@@ -300,7 +303,7 @@ export default function EditProduct() {
         .form-field { display:flex; flex-direction:column; gap:8px; }
         .form-field label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:500; }
 
-        /* PROTECTION SMARTPHONE : Evite le zoom système automatique avec font-size: 16px */
+        /* PROTECTION SMARTPHONE : Evite le zoom système automatique avec font-size: 16px sur mobile */
         .form-field input, .form-field select {
           padding:14px 16px;
           border:1px solid var(--border);
@@ -319,16 +322,17 @@ export default function EditProduct() {
 
         .variants-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
         .section-subtitle { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--forest); font-weight:600; margin-bottom:20px; }
+
         .variant-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
         @media(min-width: 768px) { .variant-card { padding:24px; } }
 
         .variant-card-header { display:flex; flex-direction: column; gap:12px; align-items: flex-start; margin-bottom:16px; }
         @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
 
-        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:4px; font-weight:500; }
+        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:4px; font-weight:500; -webkit-appearance: none; }
         @media(min-width: 600px) { .btn-remove-variant { padding-bottom:16px; } }
 
-        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:14px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; text-align: center; }
+        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:14px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; text-align: center; -webkit-appearance: none; }
 
         .sizes-section { margin-top:32px; padding:20px; background:var(--cream); border:1px solid var(--border); }
         @media(min-width: 768px) { .sizes-section { padding:30px; } }
