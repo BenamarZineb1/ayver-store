@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getCart } from "@/lib/cart";
 
@@ -33,7 +34,7 @@ export default function HomePage() {
           setProducts(data.slice(0, 4));
         }
       })
-      .catch((e) => console.error("Erreur API:", e));
+      .catch((e) => console.error("Erreur API accueil:", e));
 
     const updateCartCount = () => {
       const cart = getCart();
@@ -44,9 +45,11 @@ export default function HomePage() {
     updateCartCount();
 
     window.addEventListener("storage", updateCartCount);
+    window.addEventListener("cart-updated", updateCartCount);
 
     return () => {
       window.removeEventListener("storage", updateCartCount);
+      window.removeEventListener("cart-updated", updateCartCount);
     };
   }, []);
 
@@ -62,7 +65,6 @@ export default function HomePage() {
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8; --danger:#8B2020;
         }
 
-        /* CORRECTION CRITIQUE CONTRE L'ÉCRAN NOIR SUR MOBILE */
         html, body {
           background-color: #F0EDE6 !important;
           margin: 0;
@@ -75,7 +77,6 @@ export default function HomePage() {
         html { scroll-behavior: smooth; }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
 
-        /* NAVBAR & ANNOUNCEMENT */
         .announce { background:var(--dark); color:var(--cream); text-align:center; padding:10px 20px; font-size:11px; letter-spacing:2px; font-weight:400; text-transform:uppercase; line-height:1.4; }
         nav { position:sticky; top:0; z-index:100; background:var(--cream); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:72px; }
         .nav-links { display:flex; gap:36px; list-style:none; }
@@ -88,7 +89,6 @@ export default function HomePage() {
         .nav-icon { background:none; border:none; cursor:pointer; font-size:12px; color:var(--dark); text-decoration:none; font-family:'Jost',sans-serif; text-transform:uppercase; font-weight:500; letter-spacing:1px; display:flex; align-items:center; }
         .nav-icon span.badge { background:var(--dark); color:var(--cream); padding:2px 7px; border-radius:10px; font-size:10px; margin-left:6px; font-weight:400; }
 
-        /* HERO SECTION RESPONSIVE */
         .hero { position:relative; min-height:75vh; display:flex; align-items:center; overflow:hidden; background:var(--dark); padding:60px 0; }
         .hero-bg { position:absolute; inset:0; background:linear-gradient(135deg,var(--forest) 0%,var(--dark) 60%,#0A1209 100%); }
         .hero-content { position:relative; z-index:2; max-width:1300px; margin:0 auto; padding:0 40px; display:flex; flex-direction:column; align-items:center; text-align:center; width:100%; }
@@ -98,14 +98,12 @@ export default function HomePage() {
         .btn-primary { background:var(--cream); color:var(--dark); padding:16px 36px; border:none; cursor:pointer; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2.5px; text-transform:uppercase; font-weight:500; text-decoration:none; display:inline-block; transition: background 0.3s; }
         .btn-primary:hover { background: var(--white); }
 
-        /* SECTIONS GENERAL CONFIG */
         section { padding:100px 40px; }
         .section-header { text-align:center; margin-bottom:64px; }
         .section-eyebrow { font-size:10px; letter-spacing:4px; color:var(--text-muted); text-transform:uppercase; margin-bottom:16px; display:block; }
         .section-title { font-family:'Playfair Display',serif; font-size:clamp(32px, 4vw, 54px); font-weight:700; color:var(--dark); line-height:1.1; }
         .section-title em { font-style:italic; color:var(--accent); font-weight:400; }
 
-        /* ARRIVALS GRILLE RESPONSIVE & STOCK MANAGEMENT */
         .products { background:var(--cream); }
         .products-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:28px; max-width:1300px; margin:0 auto; }
 
@@ -113,10 +111,10 @@ export default function HomePage() {
         .prod-card.is-sold-out { opacity: 0.65; }
 
         .prod-img { aspect-ratio:3/4; background:var(--dark); position:relative; overflow:hidden; margin-bottom:16px; border-radius:2px; display:flex; align-items:center; justify-content:center; }
-        .prod-img img { width:100%; height:100%; object-fit:cover; transition:transform .5s ease; position:absolute; inset:0; }
+        .product-image { object-fit:cover; transition:transform .5s ease; }
         .prod-img-inner { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:64px; font-weight:900; color:rgba(255,255,255,.05); font-style:italic; transition:transform .5s ease; }
 
-        .prod-card:not(.is-sold-out):hover .prod-img img,
+        .prod-card:not(.is-sold-out):hover .product-image,
         .prod-card:not(.is-sold-out):hover .prod-img-inner { transform:scale(1.04); }
 
         .prod-badge { position:absolute; top:12px; left:12px; background:var(--forest); color:var(--cream); font-size:9px; letter-spacing:2px; padding:4px 10px; text-transform:uppercase; z-index:4; }
@@ -137,7 +135,6 @@ export default function HomePage() {
         .sizes-preview { display:flex; gap:6px; margin-top:10px; flex-wrap: wrap; }
         .size-dot { font-size:9px; letter-spacing:1px; border:1px solid var(--border); padding:3px 7px; color:var(--text-muted); text-transform:uppercase; background: var(--white); }
 
-        /* FEATURES ATELIER - OPTIMISÉ POUR PC */
         .features { background:var(--dark); padding:80px 40px; }
         .features-inner { max-width:1300px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:40px; }
         .feat { display:flex; flex-direction:column; align-items:center; text-align:center; gap:16px; }
@@ -152,7 +149,6 @@ export default function HomePage() {
         .feat-title { font-family:'Playfair Display',serif; font-size:16px; color:var(--cream); font-weight:600; }
         .feat-text { font-size:13px; color:rgba(240,237,230,.45); line-height:1.7; }
 
-        /* FOOTER EXTÉRIEUR SARTORIAL */
         footer { background:#0A0F0B; color:var(--cream); padding:60px 40px; border-top:1px solid rgba(196,168,130,0.1); }
         .footer-inner { max-width:1300px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:30px; }
         .footer-brand { flex:1; min-width:280px; }
@@ -268,7 +264,8 @@ export default function HomePage() {
           {products.length > 0 ? (
             products.map((p) => {
               const isOut = p.stock === 0 || p.isOutOfStock;
-              const discount = p.oldPrice && p.oldPrice > p.price ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100) : null;
+              const hasDiscount = p.oldPrice && p.oldPrice > p.price;
+              const discount = hasDiscount ? Math.round(((p.oldPrice! - p.price) / p.oldPrice!) * 100) : null;
               const initialLetter = p.name ? p.name.charAt(0) : "A";
 
               const availableSizes = p.sizes ? Object.keys(p.sizes).filter((s) => p.sizes[s] === true) : [];
@@ -288,7 +285,14 @@ export default function HomePage() {
                 >
                   <div className="prod-img">
                     {p.images?.[0] ? (
-                      <img src={p.images[0]} alt={p.name} loading="lazy" />
+                      <Image
+                        src={p.images[0]}
+                        alt={p.name}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                        className="product-image"
+                        loading="lazy"
+                      />
                     ) : (
                       <div className="prod-img-inner">{initialLetter}</div>
                     )}
@@ -311,7 +315,7 @@ export default function HomePage() {
                   <div className="prod-name">{p.name}</div>
                   <div className="prod-price">
                     <span className="price-new">{p.price} DH</span>
-                    {p.oldPrice && <span className="price-old">{p.oldPrice} DH</span>}
+                    {hasDiscount && <span className="price-old">{p.oldPrice} DH</span>}
                   </div>
 
                   <div className="sizes-preview">

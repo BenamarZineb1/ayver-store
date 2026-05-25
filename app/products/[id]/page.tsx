@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { addToCart, getCart } from "@/lib/cart";
-
-interface Variant {
-  color?: string;
-  images?: string[];
-}
 
 interface Product {
   id: string;
@@ -24,7 +19,6 @@ interface Product {
   images?: string[];
   isOutOfStock?: boolean;
   sizes?: Record<string, boolean>;
-  variants?: Variant[];
 }
 
 export default function ProductPage() {
@@ -44,9 +38,8 @@ export default function ProductPage() {
         setProduct(data);
 
         const firstImg =
-          data.images?.[0] ||
           data.image ||
-          data.variants?.find((v) => (v.images?.length ?? 0) > 0)?.images?.[0] ||
+          data.images?.[0] ||
           "/placeholder.jpg";
         setActiveImage(firstImg);
 
@@ -71,8 +64,11 @@ export default function ProductPage() {
     updateCartCount();
 
     window.addEventListener("storage", updateCartCount);
+    window.addEventListener("cart-updated", updateCartCount);
+
     return () => {
       window.removeEventListener("storage", updateCartCount);
+      window.removeEventListener("cart-updated", updateCartCount);
     };
   }, [id]);
 
@@ -85,25 +81,18 @@ export default function ProductPage() {
       price: product.price,
       size: size,
       image: activeImage
-    } as any);
+    });
 
-    const updatedCart = getCart();
-    setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
+    // Notification et rafraîchissement global et immédiat
+    window.dispatchEvent(new Event("cart-updated"));
 
     setAddedProduct(product.name);
     setTimeout(() => setAddedProduct(null), 3000);
   };
 
-  const handleVariantSelect = (variantImages?: string[]) => {
-    if (variantImages && variantImages.length > 0) {
-      setActiveImage(variantImages[0]);
-    }
-  };
-
   if (!product) {
     return (
       <>
-        {/* BLINDAGE SUR L'ÉCRAN DE CHARGEMENT */}
         <style dangerouslySetInnerHTML={{ __html: `
           html, body {
             background-color: #F0EDE6 !important;
@@ -126,9 +115,10 @@ export default function ProductPage() {
     ? Object.keys(product.sizes).filter((s) => product.sizes?.[s] === true)
     : [];
 
+  // Déduplication de la galerie à plat simplifiée
   const allImages: string[] = [
-    ...(product.images || []),
-    ...(product.variants?.flatMap((v) => v.images || []) || [])
+    ...(product.image ? [product.image] : []),
+    ...(product.images || [])
   ].filter((img, index, self) => img && self.indexOf(img) === index);
 
   return (
@@ -143,7 +133,6 @@ export default function ProductPage() {
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8; --danger:#8B2020;
         }
 
-        /* PROTECTION CRITIQUE CONTRE L'ÉCRAN NOIR MOBILE */
         html, body {
           background-color: #F0EDE6 !important;
           color: #131C14 !important;
@@ -196,11 +185,6 @@ export default function ProductPage() {
         .stock-tag { font-size:11px; font-weight:500; color:var(--forest); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:24px; display:inline-flex; align-items:center; }
         .stock-tag.out { color:var(--danger); }
 
-        .variant-section { margin-bottom:24px; border-top: 1px solid var(--border); padding-top: 20px; }
-        .variant-grid { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
-        .variant-pill { padding: 6px 14px; border: 1px solid var(--border); background: var(--white); font-size: 12px; cursor: pointer; font-family: 'Jost', sans-serif; transition: all 0.2s; text-transform: capitalize; }
-        .variant-pill:hover { border-color: var(--dark); }
-
         .size-section { margin-bottom:32px; }
         .size-label { font-size:11px; letter-spacing:2px; color:var(--text-muted); text-transform:uppercase; margin-bottom:12px; font-weight:500; }
         .size-grid { display:flex; gap:10px; flex-wrap:wrap; }
@@ -239,12 +223,12 @@ export default function ProductPage() {
         @media (max-width:640px) { .features-inner { grid-template-columns: 1fr 1fr; } .product-container { padding:30px 20px 60px 20px; } .nav-links { display:none; } }
       `}} />
 
-      {/* NOTIFICATION COMPTEUR */}
+      {/* NOTIFICATION */}
       <div className={`toast ${addedProduct ? "show" : ""}`}>
         ✨ Ajouté au Panier : {addedProduct} ({size})
       </div>
 
-      {/* BARRE DE NAVIGATION */}
+      {/* NAVBAR */}
       <nav id="navbar">
         <ul className="nav-links">
           <li><Link href="/products">CATALOGUE</Link></li>
@@ -262,11 +246,11 @@ export default function ProductPage() {
         </div>
       </nav>
 
-      {/* PIÈCE DE SÉLECTION */}
+      {/* PROD HEADER */}
       <div className="product-container">
         <div className="product-layout">
 
-          {/* GALERIE PRINCIPALE */}
+          {/* GALERIE PHOTO ALIGNÉE */}
           <div className="gallery-wrapper">
             <div className="image-box">
               <div className="image-placeholder">{initialLetter}</div>
@@ -314,7 +298,7 @@ export default function ProductPage() {
             )}
           </div>
 
-          {/* FICHE DESCRIPTIVE COMPLÈTE */}
+          {/* FICHE TECH */}
           <div className="info-box">
             <span className="info-category">{product.club || product.category || "Atelier AYVER"}</span>
             <h1 className="info-title">{product.name}</h1>
@@ -328,25 +312,7 @@ export default function ProductPage() {
               {!isGloballyOut ? "✓ Pièce disponible en stock" : "✕ Édition archivée / épuisée"}
             </div>
 
-            {/* OPTIONS DE VARIANTES */}
-            {product.variants && product.variants.length > 0 && (
-              <div className="variant-section">
-                <p className="size-label">Couleurs & Déclinaisons</p>
-                <div className="variant-grid">
-                  {product.variants.map((v, index) => (
-                    <button
-                      key={index}
-                      className="variant-pill"
-                      onClick={() => handleVariantSelect(v.images)}
-                    >
-                      {v.color || `Déclinaison ${index + 1}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* RECONNAISSANCE DES CAPACITÉS DE TAILLE */}
+            {/* SYSTÈME DE TAILLES UNIQUE OU MULTIPLE */}
             <div className="size-section">
               <p className="size-label">
                 {product.category === "sneakers" ? "Sélectionner la Pointure" : "Sélectionner la Taille"}
@@ -383,7 +349,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* GRID LOGISTIQUE DE CONFIANCE */}
+      {/* MARQUES DE SERVICE */}
       <div className="features">
         <div className="features-inner">
           <div className="feat">

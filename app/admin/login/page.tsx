@@ -26,11 +26,14 @@ export default function AdminLogin() {
         throw new Error(data.error || "Identifiants invalides ou erreur serveur");
       }
 
-      // 🟢 REDIRECTION CORRIGÉE : Force un rechargement complet vers la racine du domaine
-      // C'est à la racine ("/") que le middleware va détecter le cookie et faire le rewrite magique.
+      // 🟢 REDIRECTION FORCEE : Déclenche le rewrite du proxy/middleware à la racine
       window.location.href = "/";
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Une erreur inattendue est survenue");
+      }
     } finally {
       setLoading(false);
     }
@@ -38,12 +41,7 @@ export default function AdminLogin() {
 
   return (
     <div className="login-viewport">
-      {/* Chargement propre des polices Google Fonts */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700&family=Jost:wght=200;300;400;500&display=swap" rel="stylesheet" />
-
-      {/* Le CSS est figé ici pour éviter le clignotement à chaque saisie de touche */}
+      {/* Le CSS reste injecté ici de manière stable */}
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

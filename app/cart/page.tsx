@@ -18,16 +18,23 @@ export default function CartPage() {
   useEffect(() => {
     updateCartState();
 
-    // Remplacement du rafraîchissement par intervalle par un écouteur d'événement natif et performant
+    // Écouteur pour les onglets/fenêtres tiers
     window.addEventListener("storage", updateCartState);
+    // Écouteur personnalisé pour l'onglet actif courant
+    window.addEventListener("cart-updated", updateCartState);
+
     return () => {
       window.removeEventListener("storage", updateCartState);
+      window.removeEventListener("cart-updated", updateCartState);
     };
   }, []);
 
-  function handleRemove(id: string | number) {
-    removeFromCart(id);
+  // Correction de la signature pour cibler la ligne exacte (ID + Taille)
+  function handleRemove(id: string | number, size?: string) {
+    removeFromCart(id, size);
     updateCartState();
+    // Propagation immédiate du changement vers les autres composants abonnés
+    window.dispatchEvent(new Event("cart-updated"));
   }
 
   const total = cart.reduce(
@@ -35,7 +42,6 @@ export default function CartPage() {
     0
   );
 
-  // Envoi de la commande structurée vers le WhatsApp Business d'AYVER
   function handleCheckout() {
     if (cart.length === 0) return;
 
@@ -68,7 +74,6 @@ export default function CartPage() {
         }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
 
-        /* NAVBAR SÉLECTIVE */
         nav { position:sticky; top:0; z-index:100; background:var(--cream); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:72px; }
         .nav-links { display:flex; gap:36px; list-style:none; }
         .nav-links a { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; text-decoration:none; color:var(--dark); font-weight:400; }
@@ -79,14 +84,12 @@ export default function CartPage() {
         .nav-icon { background:none; border:none; cursor:pointer; font-size:14px; color:var(--dark); text-decoration:none; font-family:'Jost',sans-serif; text-transform:uppercase; font-weight:500; letter-spacing:1px; }
         .nav-icon span.badge { background:var(--dark); color:var(--cream); padding:2px 6px; border-radius:10px; font-size:10px; margin-left:4px; }
 
-        /* STRUCTURE PANIER */
         .cart-container { max-width:700px; margin: 0 auto; padding: 60px 20px 100px 20px; min-height: 65vh; }
         .cart-header { text-align: center; margin-bottom: 48px; }
         .cart-header h1 { font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
         .cart-header h1 em { font-style: italic; color: var(--accent); }
         .cart-header p { color: var(--text-muted); font-size: 13px; letter-spacing: 1px; }
 
-        /* LISTE DES PIÈCES ET VIGNETTES */
         .cart-list { display: flex; flex-direction: column; gap: 16px; }
         .cart-item { display: flex; gap: 20px; padding: 20px; background: var(--white); border: 1px solid var(--border); border-radius: 2px; align-items: center; }
 
@@ -101,7 +104,6 @@ export default function CartPage() {
         .item-remove-btn { font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; border: none; background: transparent; color: var(--danger); cursor: pointer; padding: 0; margin-top: 12px; font-weight: 500; text-align: left; width: fit-content; transition: opacity 0.2s; }
         .item-remove-btn:hover { opacity: 0.7; }
 
-        /* SUMMARY & ACTIONS */
         .cart-summary { margin-top: 40px; padding: 30px; background: var(--white); border: 1px solid var(--border); border-radius: 2px; }
         .summary-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
         .summary-free { color: var(--forest); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; font-size: 12px; }
@@ -112,7 +114,6 @@ export default function CartPage() {
 
         .cart-empty { text-align: center; padding: 80px 0; color: var(--text-muted); font-family: 'Playfair Display', serif; font-style: italic; font-size: 18px; }
 
-        /* CARACTÉRISTIQUES DE LA MAISON */
         .features { background:var(--dark); padding: 80px 60px; }
         .features-inner { max-width:1300px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:40px; }
         .feat { display:flex; flex-direction:column; align-items:center; text-align:center; gap:16px; }
@@ -125,7 +126,6 @@ export default function CartPage() {
         .feat-title { font-family:'Playfair Display',serif; font-size:16px; color:var(--cream); font-weight:600; }
         .feat-text { font-size:13px; color:rgba(240,237,230,.45); line-height:1.7; }
 
-        /* FOOTER BRANDING */
         footer { background:#0A0F0B; color:var(--cream); padding:60px 40px; border-top:1px solid rgba(196,168,130,0.1); }
         .footer-inner { max-width:1300px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:30px; }
         .footer-brand { flex:1; min-width:280px; }
@@ -172,11 +172,12 @@ export default function CartPage() {
           <>
             <div className="cart-list">
               {cart.map((item) => {
+                const uniqueKey = `${item.id}-${item.size || "default"}`;
                 const letter = item.name ? item.name.charAt(0) : "A";
                 const itemImage = item.image || "/placeholder.jpg";
 
                 return (
-                  <div key={`${item.id}-${item.size || "default"}`} className="cart-item">
+                  <div key={uniqueKey} className="cart-item">
                     <div className="item-img-box">
                       <div className="item-img-inner">{letter}</div>
                       <span className="item-letter">{letter}</span>
@@ -195,7 +196,10 @@ export default function CartPage() {
                       <div className="item-meta">
                         {item.price} DH × {item.qty} {item.size && `| Taille: ${item.size}`}
                       </div>
-                      <button className="item-remove-btn" onClick={() => handleRemove(item.id)}>
+                      <button
+                        className="item-remove-btn"
+                        onClick={() => handleRemove(item.id, item.size)}
+                      >
                         Retirer de la ligne
                       </button>
                     </div>

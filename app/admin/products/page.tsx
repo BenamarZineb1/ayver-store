@@ -8,9 +8,16 @@ import Image from "next/image";
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 
-interface ColorVariant {
-  color: string;
-  images: string[];
+interface ProductForm {
+  name: string;
+  price: string;
+  stock: string;
+  category: string;
+  gender: string;
+  club: string;
+  collection: string;
+  isOutOfStock: boolean;
+  sizes: Record<string, boolean>;
 }
 
 export default function NewProductPage() {
@@ -18,123 +25,130 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  // États du formulaire
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("10");
-  const [category, setCategory] = useState("jersey");
-  const [gender, setGender] = useState("unisex");
-  const [club, setClub] = useState("");
-  const [collection, setCollection] = useState("Essential Drop");
-  const [isOutOfStock, setIsOutOfStock] = useState(false);
+  // GESTION SIMPLIFIÉE DES VISUELS (À plat, sans variantes)
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
 
-  // État pour la grille des tailles sélectionnées
-  const [selectedSizes, setSelectedSizes] = useState<Record<string, boolean>>({
-    S: false, M: true, L: false, XL: false, XXL: false,
+  // État unifié du formulaire
+  const [form, setForm] = useState<ProductForm>({
+    name: "",
+    price: "",
+    stock: "10",
+    category: "jersey",
+    gender: "unisex",
+    club: "",
+    collection: "Essential Drop",
+    isOutOfStock: false,
+    sizes: { S: false, M: true, L: false, XL: false, XXL: false }
   });
 
-  // État pour les variantes de couleurs & galeries d'images associées
-  const [variants, setVariants] = useState<ColorVariant[]>([
-    { color: "Standard", images: [] }
-  ]);
-
   const handleSizeToggle = (size: string) => {
-    setSelectedSizes((prev) => ({
+    setForm(prev => ({
       ...prev,
-      [size]: !prev[size],
+      sizes: { ...prev.sizes, [size]: !prev.sizes[size] }
     }));
   };
 
   const handleCategoryChange = (cat: string) => {
-    setCategory(cat);
+    let updatedSizes: Record<string, boolean> = {};
+
     if (cat === "sneakers") {
-      const initialSneakers: Record<string, boolean> = {};
-      SNEAKER_SIZES.forEach(s => initialSneakers[s] = s === "40" || s === "41");
-      setSelectedSizes(initialSneakers);
+      SNEAKER_SIZES.forEach(s => updatedSizes[s] = s === "40" || s === "41");
     } else if (cat === "accessories") {
-      setSelectedSizes({});
+      updatedSizes = {};
     } else {
-      const initialClothing: Record<string, boolean> = {};
-      CLOTHING_SIZES.forEach(s => initialClothing[s] = s === "M");
-      setSelectedSizes(initialClothing);
+      CLOTHING_SIZES.forEach(s => updatedSizes[s] = s === "M");
     }
+
+    setForm(prev => ({ ...prev, category: cat, sizes: updatedSizes }));
   };
 
-  // Fonctions de gestion des variantes
-  function addVariant() {
-    setVariants([...variants, { color: "", images: [] }]);
-  }
-
-  function removeVariant(index: number) {
-    if (variants.length === 1) return;
-    setVariants(variants.filter((_, i) => i !== index));
-  }
-
-  function handleColorChange(index: number, value: string) {
-    const updated = [...variants];
-    updated[index].color = value;
-    setVariants(updated);
-  }
-
-  function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
+  // Traitement et création d'URLs éphémères pour l'aperçu local
+  function handleImages(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
+    const previewUrls = files.map(file => URL.createObjectURL(file));
 
-    files.forEach((file) => {
+    setImagePreviews(prev => [...prev, ...previewUrls]);
+    setRawFiles(prev => [...prev, ...files]);
+  }
+
+  // Nettoyage de la mémoire et suppression de l'image sélectionnée
+  function removeSpecificImage(imageIndex: number) {
+    const urlToDel = imagePreviews[imageIndex];
+    if (urlToDel && urlToDel.startsWith("blob:")) {
+      URL.revokeObjectURL(urlToDel);
+    }
+
+    setImagePreviews(prev => prev.filter((_, idx) => idx !== imageIndex));
+    setRawFiles(prev => prev.filter((_, idx) => idx !== imageIndex));
+  }
+
+  // COMPRESSION DES IMAGES CÔTÉ CLIENT (Limite à 1000px max, qualité 75%)
+  const fileToCompressedBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          const base64String = reader.result;
-          setVariants((prev) =>
-            prev.map((variant, i) => {
-              if (i !== variantIndex) return variant;
-              return {
-                ...variant,
-                images: [...(variant.images || []), base64String]
-              };
-            })
-          );
-        }
-      };
       reader.readAsDataURL(file);
-    });
-  }
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
 
-  function removeSpecificImage(variantIndex: number, imageIndex: number) {
-    setVariants((prev) =>
-      prev.map((variant, i) => {
-        if (i !== variantIndex) return variant;
-        return {
-          ...variant,
-          images: variant.images.filter((_, imgIdx) => imgIdx !== imageIndex)
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(event.target?.result as string);
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
+          resolve(compressedBase64);
         };
-      })
-    );
-  }
+        img.onerror = () => reject(new Error("Erreur lors de la mise à l'échelle du fichier image"));
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: "", text: "" });
 
-    const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
-
-    const payload = {
-      name,
-      price: Number(price),
-      stock: Number(stock),
-      isOutOfStock: isOutOfStock || Number(stock) === 0,
-      category,
-      gender,
-      club,
-      collection,
-      sizes: selectedSizes,
-      variants: variants,
-      image: firstImageUrl,
-      images: variants.flatMap(v => v.images || [])
-    };
-
     try {
+      // Exécution de la compression asynchrone sur toutes les images à plat
+      const base64Images = await Promise.all(
+        rawFiles.map(file => fileToCompressedBase64(file))
+      );
+
+      const hasSizes = Object.keys(form.sizes).length > 0;
+      const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
+      const firstImageUrl = base64Images[0] || null;
+
+      const payload = {
+        name: form.name,
+        price: Number(form.price),
+        stock: Number(form.stock),
+        isOutOfStock: form.isOutOfStock || Number(form.stock) === 0 || isGloballyOutOfStock,
+        category: form.category,
+        gender: form.gender,
+        club: form.club,
+        collection: form.collection,
+        sizes: form.sizes,
+        image: firstImageUrl,
+        images: base64Images
+      };
+
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -145,6 +159,12 @@ export default function NewProductPage() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "✨ Produit ajouté avec succès au vestiaire AYVER !" });
+
+        // Révocation de toutes les URLs Blob créées pour éviter les fuites mémoire
+        imagePreviews.forEach(url => {
+          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        });
+
         setTimeout(() => {
           router.push("/admin");
           router.refresh();
@@ -152,15 +172,16 @@ export default function NewProductPage() {
       } else {
         setMessage({ type: "error", text: data.error || "Une erreur est survenue." });
       }
-    } catch (error) {
-      setMessage({ type: "error", text: "Impossible de communiquer avec l'API." });
+    } catch (error: unknown) {
+      console.error(error);
+      setMessage({ type: "error", text: "Impossible de communiquer avec l'API ou d'enregistrer le produit." });
     } finally {
       setLoading(false);
     }
   };
 
-  const sortedSizes = Object.keys(selectedSizes).sort((a, b) => {
-    if (category === "sneakers") {
+  const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
+    if (form.category === "sneakers") {
       return Number(a) - Number(b);
     }
     return CLOTHING_SIZES.indexOf(a) - CLOTHING_SIZES.indexOf(b);
@@ -173,7 +194,6 @@ export default function NewProductPage() {
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-        /* FIX CRITIQUE MOBILE ANTI-GLITCH FOND NOIR */
         html, body {
           background-color: #F0EDE6 !important;
           margin: 0;
@@ -225,7 +245,6 @@ export default function NewProductPage() {
 
         label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #7A8A7B; font-weight: 500; }
 
-        /* DESACTIVER LE ZOOM SMARTPHONE GRACE AUX 16px */
         input, select {
           padding: 14px 16px;
           border: 1px solid #D4CFC8;
@@ -250,25 +269,13 @@ export default function NewProductPage() {
         .size-btn { padding: 12px 4px; border: 1px solid #D4CFC8; background: #FAFAF8; font-family: 'Jost', sans-serif; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; text-align: center; -webkit-appearance: none; }
         .size-btn.active { background: #131C14; color: #FAFAF8; border-color: #131C14; }
 
-        .variants-section { margin-top: 32px; border-top: 1px solid #D4CFC8; padding-top: 32px; }
+        .gallery-section { margin-top: 32px; border-top: 1px solid #D4CFC8; padding-top: 32px; }
         .section-subtitle { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #1A2F1C; font-weight: 600; margin-bottom: 20px; }
+        .gallery-card { background: #F0EDE6; border: 1px solid #D4CFC8; padding: 20px; margin-bottom: 20px; position: relative; border-radius: 1px; }
 
-        .variant-card { background: #F0EDE6; border: 1px solid #D4CFC8; padding: 20px; margin-bottom: 20px; position: relative; border-radius: 1px; }
-        @media(min-width: 768px) { .variant-card { padding: 24px; } }
-
-        .variant-card-header { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
-        @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
-
-        .btn-remove-variant { background: none; border: none; color: #8B2020; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; padding-bottom: 4px; font-weight: 500; }
-        @media(min-width: 600px) { .btn-remove-variant { padding-bottom: 14px; } }
-
-        .btn-add-variant { background: #FAFAF8; color: #131C14; border: 1px dashed #C4A882; padding: 14px; font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; width: 100%; transition: all 0.3s; font-weight: 500; text-align: center; }
-        .btn-add-variant:hover { background: #131C14; color: #FAFAF8; border-color: #131C14; }
-
-        .upload-container { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .upload-container { display: flex; flex-direction: column; gap: 8px; }
         .images-flex { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
-        /* STRUCTURATION SÉCURISÉE POUR LE FILL DE NEXT/IMAGE */
         .img-preview-box { width: 68px; height: 90px; border: 1px solid #D4CFC8; background: #FAFAF8; overflow: hidden; position: relative; z-index: 1; }
         .img-preview-image { object-fit: cover; }
         .btn-del-img { position: absolute; top: 2px; right: 2px; background: rgba(139,32,32,0.9); color: white; border: none; width: 18px; height: 18px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; z-index: 10; }
@@ -308,8 +315,8 @@ export default function NewProductPage() {
               <input
                 type="text"
                 placeholder="Ex: Maillot Retro AC Milan 1996"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
               />
             </div>
@@ -319,8 +326,8 @@ export default function NewProductPage() {
               <input
                 type="number"
                 placeholder="Ex: 450"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
                 required
               />
             </div>
@@ -329,15 +336,15 @@ export default function NewProductPage() {
               <label>Stock Global Initial *</label>
               <input
                 type="number"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
+                value={form.stock}
+                onChange={(e) => setForm({ ...form, stock: e.target.value })}
                 required
               />
             </div>
 
             <div className="form-group">
               <label>Vestiaire (Catégorie)</label>
-              <select value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
+              <select value={form.category} onChange={(e) => handleCategoryChange(e.target.value)}>
                 <option value="jersey">Jerseys Officiels</option>
                 <option value="T-shirts">T-shirts Oversize</option>
                 <option value="hoodies-sweats">Hoodies & Sweatshirts</option>
@@ -350,7 +357,7 @@ export default function NewProductPage() {
 
             <div className="form-group">
               <label>Ligne / Genre</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value)}>
+              <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
                 <option value="unisex">Unisex / Univers Mixte</option>
                 <option value="men">Homme</option>
                 <option value="women">Femme</option>
@@ -362,8 +369,8 @@ export default function NewProductPage() {
               <input
                 type="text"
                 placeholder="Ex: Real Madrid, Paris..."
-                value={club}
-                onChange={(e) => setClub(e.target.value)}
+                value={form.club}
+                onChange={(e) => setForm({ ...form, club: e.target.value })}
               />
             </div>
 
@@ -371,20 +378,20 @@ export default function NewProductPage() {
               <label>Collection Drop</label>
               <input
                 type="text"
-                value={collection}
-                onChange={(e) => setCollection(e.target.value)}
+                value={form.collection}
+                onChange={(e) => setForm({ ...form, collection: e.target.value })}
               />
             </div>
 
-            {category !== "accessories" ? (
+            {form.category !== "accessories" ? (
               <div className="form-group full sizes-section">
-                <label>{category === "sneakers" ? "Pointures actives pour ce modèle" : "Tailles actives pour ce modèle"}</label>
+                <label>{form.category === "sneakers" ? "Pointures actives pour ce modèle" : "Tailles actives pour ce modèle"}</label>
                 <div className="sizes-grid">
                   {sortedSizes.map((sz) => (
                     <button
                       type="button"
                       key={sz}
-                      className={`size-btn ${selectedSizes[sz] ? "active" : ""}`}
+                      className={`size-btn ${form.sizes[sz] ? "active" : ""}`}
                       onClick={() => handleSizeToggle(sz)}
                     >
                       {sz}
@@ -398,70 +405,49 @@ export default function NewProductPage() {
               </div>
             )}
 
-            <div className="form-group full variants-section">
-              <div className="section-subtitle">Variantes de couleurs & Galeries photos dédiées</div>
+            {/* GALERIE DE VISUELS SIMPLIFIÉE */}
+            <div className="form-group full gallery-section">
+              <div className="section-subtitle">Gestion des visuels produits</div>
 
-              {variants.map((v, index) => (
-                <div key={index} className="variant-card">
-                  <div className="variant-card-header">
-                    <div className="form-group" style={{ flex: 1, width: "100%" }}>
-                      <label>Couleur / Variante n°{index + 1}</label>
-                      <input
-                        type="text"
-                        required
-                        value={v.color}
-                        onChange={(e) => handleColorChange(index, e.target.value)}
-                        placeholder="Ex: Rouge (Home), Blanc (Away), Noir..."
-                      />
-                    </div>
-                    {variants.length > 1 && (
-                      <button type="button" className="btn-remove-variant" onClick={() => removeVariant(index)}>
-                        Supprimer
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="upload-container">
-                    <label>Photos de la variante ({v.color || `n°${index + 1}`}) :</label>
-                    <div className="images-flex">
-                      {v.images?.map((img, i) => (
-                        <div key={i} className="img-preview-box">
-                          <Image
-                            src={img}
-                            alt="Aperçu déclinaison"
-                            fill
-                            sizes="68px"
-                            className="img-preview-image"
-                            unoptimized={img.startsWith("data:")}
-                          />
-                          <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
-                        </div>
-                      ))}
-                      <label htmlFor={`file-up-${index}`} className="add-photo-trigger">+</label>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={(e) => handleImages(e, index)}
-                        style={{ display: "none" }}
-                        id={`file-up-${index}`}
-                      />
-                    </div>
+              <div className="gallery-card">
+                <div className="upload-container">
+                  <span style={{ fontSize: "10px", letterSpacing: "1px", color: "#7A8A7B", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>
+                    Photos du produit (la première sera la photo principale) :
+                  </span>
+                  <div className="images-flex">
+                    {imagePreviews.map((img, i) => (
+                      <div key={i} className="img-preview-box">
+                        <Image
+                          src={img}
+                          alt="Aperçu produit"
+                          fill
+                          sizes="68px"
+                          className="img-preview-image"
+                          unoptimized
+                        />
+                        <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(i)}>✕</button>
+                      </div>
+                    ))}
+                    <label htmlFor="file-up-page" className="add-photo-trigger">+</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImages}
+                      style={{ display: "none" }}
+                      id="file-up-page"
+                    />
                   </div>
                 </div>
-              ))}
-
-              <button type="button" className="btn-add-variant" onClick={addVariant}>
-                + Ajouter une autre couleur / option pour ce produit
-              </button>
+              </div>
             </div>
 
             <div className="form-group full checkbox-group">
               <input
                 type="checkbox"
                 id="outOfStock"
-                checked={isOutOfStock}
-                onChange={(e) => setIsOutOfStock(e.target.checked)}
+                checked={form.isOutOfStock}
+                onChange={(e) => setForm({ ...form, isOutOfStock: e.target.checked })}
               />
               <label htmlFor="outOfStock" style={{ margin: 0, cursor: 'pointer' }}>
                 Forcer cet article en rupture de stock ("Épuisé")

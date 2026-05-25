@@ -13,7 +13,7 @@ export async function GET(request: Request, props: RouteParams) {
     const id = Number(params.id);
 
     if (isNaN(id)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+      return NextResponse.json({ error: "Identifiant article invalide (Doit être un nombre)" }, { status: 400 });
     }
 
     const product = await prisma.product.findUnique({
@@ -21,14 +21,14 @@ export async function GET(request: Request, props: RouteParams) {
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Produit non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Article non trouvé dans le vestiaire" }, { status: 404 });
     }
 
     return NextResponse.json(product);
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(
-      { error: "Erreur lors de la récupération du produit" },
+      { error: "Erreur lors de la récupération de la pièce." },
       { status: 500 }
     );
   }
@@ -40,7 +40,7 @@ export async function PUT(request: Request, props: RouteParams) {
     const id = Number(params.id);
 
     if (isNaN(id)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+      return NextResponse.json({ error: "Identifiant article invalide" }, { status: 400 });
     }
 
     const body = await request.json();
@@ -54,10 +54,13 @@ export async function PUT(request: Request, props: RouteParams) {
       sizes,
       stock,
       isOutOfStock,
-      variants,
       image,
       images
     } = body;
+
+    // Calcul automatique pour forcer l'épuisement si le stock tombe à 0
+    const finalStock = Number(stock);
+    const finalIsOutOfStock = Boolean(isOutOfStock) || finalStock === 0;
 
     const updatedProduct = await prisma.product.update({
       where: { id },
@@ -68,11 +71,11 @@ export async function PUT(request: Request, props: RouteParams) {
         gender: gender || "unisex",
         club: club || "",
         sizes: sizes || {},
-        stock: Number(stock),
-        isOutOfStock: Boolean(isOutOfStock),
-        variants: variants || [],
+        stock: finalStock,
+        isOutOfStock: finalIsOutOfStock,
         image: image || null,
         images: images || [],
+        // Le champ 'variants' a été retiré ici pour correspondre à la galerie à plat
       },
     });
 
@@ -80,7 +83,7 @@ export async function PUT(request: Request, props: RouteParams) {
   } catch (error) {
     console.error("Error updating product:", error);
     return NextResponse.json(
-      { error: "Erreur lors de la modification du produit" },
+      { error: "Erreur lors de la modification de l'article." },
       { status: 500 }
     );
   }
@@ -92,18 +95,18 @@ export async function DELETE(request: Request, props: RouteParams) {
     const id = Number(params.id);
 
     if (isNaN(id)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+      return NextResponse.json({ error: "Identifiant article invalide" }, { status: 400 });
     }
 
     await prisma.product.delete({
       where: { id },
     });
 
-    return NextResponse.json({ message: "Produit supprimé avec succès" });
+    return NextResponse.json({ message: "Article définitivement retiré du vestiaire AYVER" });
   } catch (error) {
     console.error("Error deleting product:", error);
     return NextResponse.json(
-      { error: "Erreur lors de la suppression du produit" },
+      { error: "Erreur lors de la suppression de l'article." },
       { status: 500 }
     );
   }

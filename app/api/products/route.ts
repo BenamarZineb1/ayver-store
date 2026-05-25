@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// 🔍 GET : Récupère tous les produits (sans cache)
+// 🔍 GET : Récupère tous les produits du vestiaire (sans cache)
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
@@ -23,7 +23,7 @@ export async function GET() {
   }
 }
 
-// ➕ POST : Crée un nouveau produit complet (Version nettoyée)
+// ➕ POST : Crée un nouveau produit (Schéma de galerie photo à plat)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -42,17 +42,22 @@ export async function POST(request: Request) {
       club
     } = body;
 
+    // Validation stricte des attributs fondamentaux
     if (!name || price === undefined || price === null) {
-      return NextResponse.json({ error: "Le nom et le prix sont obligatoires" }, { status: 400 });
+      return NextResponse.json({ error: "Le nom et le prix de la pièce sont obligatoires." }, { status: 400 });
     }
 
-    // 🟢 Création propre sans le champ 'variants' qui faisait planter Prisma
+    const computedStock = stock !== undefined ? Number(stock) : 10;
+
+    // Déduction logique automatique du statut de rupture
+    const computedIsOutOfStock = Boolean(isOutOfStock) || computedStock === 0;
+
     const newProduct = await prisma.product.create({
       data: {
         name,
         price: Number(price),
-        stock: stock !== undefined ? Number(stock) : 10,
-        isOutOfStock: Boolean(isOutOfStock),
+        stock: computedStock,
+        isOutOfStock: computedIsOutOfStock,
         category: category || "jersey",
         gender: gender || "unisex",
         club: club || "",
@@ -60,6 +65,7 @@ export async function POST(request: Request) {
         sizes: sizes || {},
         image: image || null,
         images: images || [],
+        // Le champ 'variants' a été supprimé pour correspondre à la galerie linéaire
       },
     });
 

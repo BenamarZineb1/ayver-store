@@ -1,12 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  gender: string;
+  club?: string | null;
+  collection?: string | null;
+  isOutOfStock: boolean;
+  image?: string | null;
+  images: string[];
+}
+
 export default function AdminDashboardRoot() {
-  const router = useRouter();
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -14,7 +26,6 @@ export default function AdminDashboardRoot() {
     setErrorMsg(null);
     fetch("/api/products", { cache: "no-store" })
       .then((res) => {
-        // Si la session a expiré en tâche de fond, redirection vers le login
         if (res.status === 401 || res.status === 403) {
           window.location.href = "/admin/login";
           return null;
@@ -46,7 +57,6 @@ export default function AdminDashboardRoot() {
     try {
       const res = await fetch("/api/admin/logout", { method: "POST" });
       if (res.ok) {
-        // Force un rechargement complet vers le login pour détruire proprement l'état local
         window.location.href = "/admin/login";
       } else {
         alert("Erreur lors de la déconnexion.");
@@ -81,7 +91,7 @@ export default function AdminDashboardRoot() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Jost:wght=300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Jost:wght@300;400;500;600&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -181,7 +191,7 @@ export default function AdminDashboardRoot() {
             <div className="error-state">⚠️ {errorMsg}</div>
           ) : (
             <>
-              {/* STRUCTURE ADAPTATIVE TABLEAU : VISIBLE SUR PC / TABLETTE */}
+              {/* PC / TABLETTE */}
               <table className="desktop-table">
                 <thead>
                   <tr>
@@ -194,12 +204,12 @@ export default function AdminDashboardRoot() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p, index) => {
+                  {products.map((p) => {
                     if (!p) return null;
                     const isOut = p.stock === 0 || p.isOutOfStock;
-                    const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+                    const mainImg = p.image || p.images?.[0] || null;
                     const name = p.name || "Article Sans Nom";
-                    const id = p.id || `temp-${index}`;
+                    const id = p.id;
 
                     return (
                       <tr key={id}>
@@ -261,14 +271,14 @@ export default function AdminDashboardRoot() {
                 </tbody>
               </table>
 
-              {/* STRUCTURE GRILLE DE CARTES : VISIBLE EXCLUSIVEMENT SUR MOBILE */}
+              {/* MOBILE */}
               <div className="mobile-cards-grid">
-                {products.map((p, index) => {
+                {products.map((p) => {
                   if (!p) return null;
                   const isOut = p.stock === 0 || p.isOutOfStock;
-                  const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+                  const mainImg = p.image || p.images?.[0] || null;
                   const name = p.name || "Article Sans Nom";
-                  const id = p.id || `temp-${index}`;
+                  const id = p.id;
                   const shortId = typeof id === "string" ? id.slice(0, 8) : "N/A";
 
                   return (

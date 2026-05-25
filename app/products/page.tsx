@@ -18,7 +18,6 @@ interface Product {
   isOutOfStock?: boolean;
   isNewDrop?: boolean;
   sizes?: Record<string, boolean>;
-  variants?: Array<{ images?: string[] }>;
 }
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
@@ -47,14 +46,15 @@ export default function CatalogPage() {
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
+          // Simulation optionnelle des drops récents sur les premiers index
           const processedData = data.map((product, index) => ({
             ...product,
-            isNewDrop: index < 4,
+            isNewDrop: product.isNewDrop ?? index < 4,
           }));
           setProducts(processedData);
         }
       })
-      .catch((e) => console.error("Erreur API:", e));
+      .catch((e) => console.error("Erreur API catalogue:", e));
 
     const updateCartCount = () => {
       const cart = getCart();
@@ -64,8 +64,11 @@ export default function CatalogPage() {
     updateCartCount();
 
     window.addEventListener("storage", updateCartCount);
+    window.addEventListener("cart-updated", updateCartCount);
+
     return () => {
       window.removeEventListener("storage", updateCartCount);
+      window.removeEventListener("cart-updated", updateCartCount);
     };
   }, []);
 
@@ -137,7 +140,7 @@ export default function CatalogPage() {
     if (product.stock === 0 || product.isOutOfStock) return;
 
     const finalSize = product.category === "accessories" ? "Unique" : selectedSize;
-    const displayImage = product.images?.[0] || product.variants?.[0]?.images?.[0] || "/placeholder.jpg";
+    const displayImage = product.images?.[0] || "/placeholder.jpg";
 
     addToCart({
       id: product.id,
@@ -145,10 +148,10 @@ export default function CatalogPage() {
       price: product.price,
       size: finalSize,
       image: displayImage
-    } as any);
+    });
 
-    const updatedCart = getCart();
-    setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
+    // Émission globale pour rafraîchir la Navbar instantanément
+    window.dispatchEvent(new Event("cart-updated"));
 
     setAddedProduct(product.name);
     setTimeout(() => setAddedProduct(null), 3000);
@@ -201,8 +204,8 @@ export default function CatalogPage() {
         <select className="filter-select" value={selectedCategory} onChange={(e) => {
           const cat = e.target.value;
           setSelectedCategory(cat);
-          if(cat === "sneakers") setSelectedSize("40");
-          else if(cat !== "accessories") setSelectedSize("M");
+          if (cat === "sneakers") setSelectedSize("40");
+          else if (cat !== "accessories") setSelectedSize("M");
         }}>
           <option value="all">Toutes les pièces</option>
           <option value="jersey">Jerseys Officiels</option>
@@ -261,7 +264,6 @@ export default function CatalogPage() {
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8;
         }
 
-        /* PROTECTION CRITIQUE CONTRE L'ÉCRAN NOIR */
         html, body {
           background-color: #F0EDE6 !important;
           color: #131C14 !important;
@@ -482,7 +484,7 @@ export default function CatalogPage() {
                 filteredProducts.map((p) => {
                   const isOut = p.stock === 0 || p.isOutOfStock === true;
                   const initialLetter = p.name ? p.name.charAt(0) : "A";
-                  const displayImage = p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+                  const displayImage = p.images?.[0] || null;
 
                   let gradBackground = "linear-gradient(135deg, #1A2F1C 0%, #0A1209 100%)";
                   if (p.category === "jersey") gradBackground = "linear-gradient(135deg, #1C1A2F 0%, #090912 100%)";

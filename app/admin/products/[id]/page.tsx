@@ -8,11 +8,6 @@ import Image from "next/image";
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 
-interface ColorVariant {
-  color: string;
-  images: string[];
-}
-
 interface ProductForm {
   name: string;
   price: string;
@@ -30,6 +25,10 @@ export default function EditProduct() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // 🟢 GESTION SIMPLIFIÉE DES IMAGES (Alignée sur le nouveau schéma)
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+
   const [form, setForm] = useState<ProductForm>({
     name: "",
     price: "",
@@ -37,8 +36,6 @@ export default function EditProduct() {
     club: "",
     sizes: {}
   });
-
-  const [variants, setVariants] = useState<ColorVariant[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -67,7 +64,13 @@ export default function EditProduct() {
           sizes: productSizes,
         });
 
-        setVariants(data.variants && data.variants.length > 0 ? data.variants : [{ color: "Standard", images: [] }]);
+        // Charger les images existantes du produit
+        if (data.images && data.images.length > 0) {
+          setImagePreviews(data.images);
+        } else if (data.image) {
+          setImagePreviews([data.image]);
+        }
+
         setLoading(false);
       })
       .catch((err) => {
@@ -92,55 +95,28 @@ export default function EditProduct() {
     setForm(prev => ({ ...prev, category: newCategory, sizes: updatedSizes }));
   }
 
-  function addVariant() {
-    setVariants([...variants, { color: "", images: [] }]);
-  }
-
-  function removeVariant(index: number) {
-    if (variants.length === 1) return;
-    setVariants(variants.filter((_, i) => i !== index));
-  }
-
-  function handleColorChange(index: number, value: string) {
-    const updated = [...variants];
-    updated[index].color = value;
-    setVariants(updated);
-  }
-
-  function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
+  // 🟢 AJOUT DES IMAGES DIRECTEMENT DANS LES TABLEAUX SIMPLES
+  function handleImages(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
+    const previewUrls = files.map(file => URL.createObjectURL(file));
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          const base64String = reader.result;
-          setVariants((prev) =>
-            prev.map((variant, i) => {
-              if (i !== variantIndex) return variant;
-              return {
-                ...variant,
-                images: [...(variant.images || []), base64String]
-              };
-            })
-          );
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setImagePreviews(prev => [...prev, ...previewUrls]);
+    setRawFiles(prev => [...prev, ...files]);
   }
 
-  function removeSpecificImage(variantIndex: number, imageIndex: number) {
-    setVariants((prev) =>
-      prev.map((variant, i) => {
-        if (i !== variantIndex) return variant;
-        return {
-          ...variant,
-          images: variant.images.filter((_, imgIdx) => imgIdx !== imageIndex)
-        };
-      })
-    );
+  // 🟢 SUPPRESSION D'UNE IMAGE PAR SON INDEX UNIQUE
+  function removeSpecificImage(imageIndex: number) {
+    const urlToDel = imagePreviews[imageIndex];
+    if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
+
+    setImagePreviews(prev => prev.filter((_, idx) => idx !== imageIndex));
+    // Ajustement de l'index pour le tableau des fichiers bruts s'il s'agit d'un nouvel ajout
+    const totalExistingCount = imagePreviews.length - rawFiles.length;
+    if (imageIndex >= totalExistingCount) {
+      const rawIdx = imageIndex - totalExistingCount;
+      setRawFiles(prev => prev.filter((_, idx) => idx !== rawIdx));
+    }
   }
 
   function toggleSize(size: string) {
@@ -150,26 +126,76 @@ export default function EditProduct() {
     }));
   }
 
+  // OPTIMISATION : Compresse et réduit l'image côté client avant conversion en Base64
+  const fileToCompressedBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(event.target?.result as string);
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error("Erreur de chargement de l'image pour compression"));
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   async function handleUpdate(e: FormEvent) {
     e.preventDefault();
     if (!id) return;
     setSubmitting(true);
 
-    const hasSizes = Object.keys(form.sizes).length > 0;
-    const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
-    const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
-
-    const payload = {
-      ...form,
-      price: Number(form.price),
-      stock: isGloballyOutOfStock ? 0 : 10,
-      isOutOfStock: isGloballyOutOfStock,
-      variants: variants,
-      image: firstImageUrl,
-      images: variants.flatMap(v => v.images || [])
-    };
-
     try {
+      // Conserver les images déjà au format distant (HTTP/HTTPS/Data-URL existant)
+      const existingUrls = imagePreviews.filter(url => !url.startsWith("blob:"));
+
+      // Traiter et compresser uniquement les fichiers nouvellement téléversés
+      const newBase64Images = await Promise.all(
+        rawFiles.map(file => fileToCompressedBase64(file))
+      );
+
+      const finalImagesCollection = [...existingUrls, ...newBase64Images];
+      const hasSizes = Object.keys(form.sizes).length > 0;
+      const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
+      const firstImageUrl = finalImagesCollection[0] || null;
+
+      // 🟢 PAYLOAD NETTOYÉ SANS LE CHAMP VARIANTS
+      const payload = {
+        name: form.name,
+        price: Number(form.price),
+        category: form.category,
+        club: form.club,
+        sizes: form.sizes,
+        stock: isGloballyOutOfStock ? 0 : 10,
+        isOutOfStock: isGloballyOutOfStock,
+        collection: "Essential Drop",
+        gender: "unisex",
+        image: firstImageUrl,
+        images: finalImagesCollection
+      };
+
       const res = await fetch(`/api/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -177,6 +203,10 @@ export default function EditProduct() {
       });
 
       if (!res.ok) throw new Error("Erreur lors de la mise à jour");
+
+      imagePreviews.forEach(url => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
 
       router.push("/admin");
       router.refresh();
@@ -229,7 +259,6 @@ export default function EditProduct() {
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-        /* FIX RESPONSIVE & MOBILE BLACK BACKGROUND ANTI-GLITCH */
         html, body {
           background-color: #F0EDE6 !important;
           margin: 0;
@@ -276,11 +305,7 @@ export default function EditProduct() {
         }
 
         .admin-header h1 { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; color:var(--dark); line-height: 1.2; }
-
-        @media(min-width: 768px) {
-          .admin-header h1 { font-size:42px; }
-        }
-
+        @media(min-width: 768px) { .admin-header h1 { font-size:42px; } }
         .admin-header h1 em { font-style:italic; font-weight:400; color:var(--forest); }
         .admin-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
@@ -303,7 +328,6 @@ export default function EditProduct() {
         .form-field { display:flex; flex-direction:column; gap:8px; }
         .form-field label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:500; }
 
-        /* PROTECTION SMARTPHONE : Evite le zoom système automatique avec font-size: 16px sur mobile */
         .form-field input, .form-field select {
           padding:14px 16px;
           border:1px solid var(--border);
@@ -316,27 +340,14 @@ export default function EditProduct() {
           -webkit-appearance: none;
         }
 
-        @media (min-width: 768px) {
-          .form-field input, .form-field select { font-size: 14px; }
-        }
+        @media (min-width: 768px) { .form-field input, .form-field select { font-size: 14px; } }
 
-        .variants-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
+        .gallery-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
         .section-subtitle { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--forest); font-weight:600; margin-bottom:20px; }
-
-        .variant-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
-        @media(min-width: 768px) { .variant-card { padding:24px; } }
-
-        .variant-card-header { display:flex; flex-direction: column; gap:12px; align-items: flex-start; margin-bottom:16px; }
-        @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
-
-        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:4px; font-weight:500; -webkit-appearance: none; }
-        @media(min-width: 600px) { .btn-remove-variant { padding-bottom:16px; } }
-
-        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:14px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; text-align: center; -webkit-appearance: none; }
+        .gallery-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
 
         .sizes-section { margin-top:32px; padding:20px; background:var(--cream); border:1px solid var(--border); }
         @media(min-width: 768px) { .sizes-section { padding:30px; } }
-
         .sizes-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:16px; text-align:center; }
 
         .sizes-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
@@ -353,11 +364,10 @@ export default function EditProduct() {
         .size-out-of-stock .size-label { color: var(--text-muted); text-decoration: line-through; }
         .size-out-of-stock .status-indicator { color: var(--danger); }
 
-        .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+        .upload-container { display:flex; flex-direction:column; gap:8px; }
         .upload-label { font-size: 11px; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
         .images-flex { display:flex; flex-wrap:wrap; gap:12px; align-items: center; margin-top: 4px; }
 
-        /* RELATIVE CONTEXT FOR NEXT/IMAGE FILL CRITICAL FIX */
         .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; z-index: 1; }
         .img-preview-image { object-fit:cover; }
         .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.9); color:white; border:none; width:18px; height:18px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:10; }
@@ -461,56 +471,36 @@ export default function EditProduct() {
               </div>
             )}
 
-            <div className="variants-section">
-              <div className="section-subtitle">Variantes de couleurs & Galeries photos dédiées</div>
+            {/* 🟢 BLOC GALERIE DE PHOTOS SIMPLIFIÉ ET NETTOYÉ */}
+            <div className="gallery-section">
+              <div className="section-subtitle">Gestion des visuels produits</div>
 
-              {variants.map((v, index) => (
-                <div key={index} className="variant-card">
-                  <div className="variant-card-header">
-                    <div className="form-field" style={{ flex: 1, width: "100%" }}>
-                      <label>Couleur / Variante n°{index + 1}</label>
-                      <input
-                        type="text" required value={v.color}
-                        onChange={(e) => handleColorChange(index, e.target.value)}
-                      />
-                    </div>
-                    {variants.length > 1 && (
-                      <button type="button" className="btn-remove-variant" onClick={() => removeVariant(index)}>
-                        Supprimer
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="upload-container">
-                    <span className="upload-label">Photos de la variante ({v.color || `n°${index + 1}`}) :</span>
-                    <div className="images-flex">
-                      {v.images?.map((img, i) => (
-                        <div key={i} className="img-preview-box">
-                          <Image
-                            src={img}
-                            alt="Aperçu déclinaison"
-                            fill
-                            sizes="68px"
-                            className="img-preview-image"
-                            unoptimized={img.startsWith("data:")}
-                          />
-                          <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
-                        </div>
-                      ))}
-                      <label htmlFor={`file-up-${index}`} className="add-photo-trigger">+</label>
-                      <input
-                        type="file" multiple accept="image/*"
-                        onChange={(e) => handleImages(e, index)}
-                        style={{ display: "none" }} id={`file-up-${index}`}
-                      />
-                    </div>
+              <div className="gallery-card">
+                <div className="upload-container">
+                  <span className="upload-label">Photos du produit (la première sera la photo principale) :</span>
+                  <div className="images-flex">
+                    {imagePreviews.map((img, i) => (
+                      <div key={i} className="img-preview-box">
+                        <Image
+                          src={img}
+                          alt="Aperçu produit"
+                          fill
+                          sizes="68px"
+                          className="img-preview-image"
+                          unoptimized
+                        />
+                        <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(i)}>✕</button>
+                      </div>
+                    ))}
+                    <label htmlFor="file-up-edit" className="add-photo-trigger">+</label>
+                    <input
+                      type="file" multiple accept="image/*"
+                      onChange={handleImages}
+                      style={{ display: "none" }} id="file-up-edit"
+                    />
                   </div>
                 </div>
-              ))}
-
-              <button type="button" className="btn-add-variant" onClick={addVariant}>
-                + Ajouter une autre couleur / option pour ce produit
-              </button>
+              </div>
             </div>
 
             <div className="form-actions-bar">
@@ -523,7 +513,7 @@ export default function EditProduct() {
         </main>
 
         <footer className="admin-footer">
-          <div>Panneau d'Administration Sécurisé Mark II</div>
+          <div>Panneau d'Administration Sécurisé</div>
           <div>AYVER 2026</div>
         </footer>
       </div>

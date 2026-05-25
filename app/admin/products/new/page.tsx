@@ -20,7 +20,7 @@ export default function NewProduct() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // 🟢 GESTION SIMPLIFIÉE DES IMAGES (Sans structure de variante de couleur)
+  // GESTION SIMPLIFIÉE DES IMAGES
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [rawFiles, setRawFiles] = useState<File[]>([]);
 
@@ -53,7 +53,7 @@ export default function NewProduct() {
     }));
   }
 
-  // 🟢 AJOUT DES IMAGES DIRECTEMENT DANS LES TABLEAUX SIMPLES
+  // AJOUT DES IMAGES DIRECTEMENT DANS LES TABLEAUX SIMPLES
   function handleImages(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
@@ -63,10 +63,12 @@ export default function NewProduct() {
     setRawFiles(prev => [...prev, ...files]);
   }
 
-  // 🟢 SUPPRESSION D'UNE IMAGE PAR SON INDEX UNIQUE
+  // SUPPRESSION D'UNE IMAGE PAR SON INDEX UNIQUE
   function removeSpecificImage(imageIndex: number) {
     const urlToDel = imagePreviews[imageIndex];
-    if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
+    if (urlToDel && urlToDel.startsWith("blob:")) {
+      URL.revokeObjectURL(urlToDel);
+    }
 
     setImagePreviews(prev => prev.filter((_, idx) => idx !== imageIndex));
     setRawFiles(prev => prev.filter((_, idx) => idx !== imageIndex));
@@ -128,7 +130,7 @@ export default function NewProduct() {
     setLoading(true);
 
     try {
-      // 🟢 COMPRESSION DIRECTE DU TABLEAU DE FICHIERS SIMPLES
+      // COMPRESSION DIRECTE DU TABLEAU DE FICHIERS SIMPLES
       const base64Images = await Promise.all(
         rawFiles.map(file => fileToCompressedBase64(file))
       );
@@ -137,7 +139,6 @@ export default function NewProduct() {
       const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
       const firstImageUrl = base64Images[0] || null;
 
-      // 🟢 PAYLOAD PARFAITEMENT ALIGNÉ SUR TON API ET SANS COMPOSANTE VARIANT
       const payload = {
         name: form.name,
         price: Number(form.price),
@@ -148,8 +149,8 @@ export default function NewProduct() {
         isOutOfStock: isGloballyOutOfStock,
         collection: "Essential Drop",
         gender: "unisex",
-        image: firstImageUrl,  // Première image comme couverture
-        images: base64Images  // Toutes les images à plat
+        image: firstImageUrl,
+        images: base64Images
       };
 
       const res = await fetch("/api/products", {
@@ -170,9 +171,10 @@ export default function NewProduct() {
 
       router.push("/admin");
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      alert(error.message || "Une erreur est survenue lors de l'enregistrement du nouveau produit.");
+      const message = error instanceof Error ? error.message : "Une erreur est survenue";
+      alert(message || "Une erreur est survenue lors de l'enregistrement du nouveau produit.");
     } finally {
       setLoading(false);
     }
@@ -396,7 +398,7 @@ export default function NewProduct() {
               </div>
             )}
 
-            {/* 🟢 BLOC GALERIE DE PHOTOS NETTOYÉ ET ADAPTÉ */}
+            {/* BLOC GALERIE DE PHOTOS */}
             <div className="gallery-section">
               <div className="section-subtitle">Gestion des visuels produits</div>
 

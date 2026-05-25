@@ -8,30 +8,33 @@ datasource db {
 }
 
 model Product {
-  id           Int      @id @default(autoincrement())
-  name         String   @db.VarChar(255)
-  price        Int
-  oldPrice     Int?     @map("old_price")
-  club         String?  @db.VarChar(100)
-  category     String   @db.VarChar(100)
-  stock        Int      @default(0)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  collection   String   @default("Street Classic") @db.VarChar(100)
-  gender       String   @default("unisex") @db.VarChar(20)
-  isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
-  sizes        Json     @default("{\"L\": true, \"M\": true, \"S\": true, \"XL\": true, \"XXL\": true}")
+  id           Int         @id @default(autoincrement())
+  name         String      @db.VarChar(255)
+  price        Int         // Prix en DH (ex: 299)
+  oldPrice     Int?        @map("old_price") // Prix avant réduction (ex: 399)
+  club         String?     @db.VarChar(100)  // Nom du club pour les maillots (ex: "Real Madrid")
+  category     String      @db.VarChar(100)  // Catégorie d'article (ex: "Jerseys", "Streetwear")
+  stock        Int         @default(0)
+  collection   String      @default("Street Classic") @db.VarChar(100)
+  gender       String      @default("unisex") @db.VarChar(20)
+  isOutOfStock Boolean     @default(false) @map("is_out_of_stock")
 
-  // 🟢 Les deux seuls champs photos requis par ton API et ton formulaire
-  image        String?  // Photo principale de couverture
-  images       String[] // Toutes les photos de la galerie à plat
+  // Structure attendue pour le JSON des tailles : {"S": true, "M": true, "L": false}
+  sizes        Json        @default("{\"S\": true, \"M\": true, \"L\": true, \"XL\": true, \"XXL\": true}")
+
+  // 📸 Gestion simplifiée des médias à plat
+  image        String?     // URL de la photo de couverture principale
+  images       String[]    // Tableau contenant l'ensemble de la galerie photo
+
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
 
   @@map("products")
 }
 
 model Order {
   id        Int         @id @default(autoincrement())
-  total     Int
-  status    String      @default("pending") @db.VarChar(50)
+  total     Int         // Montant total de la commande en DH
+  status    String      @default("pending") @db.VarChar(50) // "pending", "confirmed", "shipped", "cancelled"
   createdAt DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
   items     OrderItem[]
 
@@ -41,11 +44,12 @@ model Order {
 model OrderItem {
   id          Int     @id @default(autoincrement())
   orderId     Int     @map("order_id")
-  productName String  @map("product_name") @db.VarChar(255)
+  productName String  @map("product_name") @db.VarChar(255) // Copie du nom pour l'historique en cas de suppression produit
   size        String? @db.VarChar(10)
-  price       Int
-  qty         Int
-  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  price       Int     // Prix unitaire facturé au moment de l'achat
+  qty         Int     // Quantité achetée
+
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }

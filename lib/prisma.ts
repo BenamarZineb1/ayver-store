@@ -4,16 +4,17 @@ const globalForPrisma = global as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// On vérifie si on est en train de compiler sur Vercel
-const isBuilding = process.env.NEXT_PHASE === "phase-production-build";
-
+/**
+ * Singleton de PrismaClient :
+ * Garantit qu'une seule instance de connexion est créée en mode Développement,
+ * évitant l'accumulation de connexions ouvertes lors du rechargement à chaud (Hot Reload).
+ */
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ["error", "warn"],
-    // Si on build, on empêche Prisma de bloquer le processus en cas de base vide
-    datasourceUrl: isBuilding ? undefined : process.env.DATABASE_URL,
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error", "warn"],
   });
 
-if (process.env.NODE_ENV !== "production")
+if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
+}
