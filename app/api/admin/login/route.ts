@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { crypto } from "next/dist/compiled/@edge-runtime/primitives/crypto";
 
-// Fonction utilitaire pour générer une valeur aléatoire sécurisée pour le cookie
+// 💡 Utilisation de l'API standard globale 'crypto' disponible nativement dans Node.js et l'Edge runtime
 function generateSecureToken(): string {
   const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
+  globalThis.crypto.getRandomValues(array);
   return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
       const sessionToken = generateSecureToken();
 
       // Configuration du cookie avec des directives de sécurité maximales
-      response.cookies.set("admin_session", sessionToken, {
+      response.cookies.set("admin_session", "authenticated_ayver", {
         httpOnly: true,                 // Bloque l'accès via le JavaScript client (anti-XSS)
         secure: process.env.NODE_ENV === "production", // Exige HTTPS en environnement de production
         sameSite: "strict",             // Bloque l'envoi du cookie lors de requêtes tierces (anti-CSRF)
