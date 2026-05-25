@@ -117,7 +117,6 @@ export default function NewProductPage() {
     setLoading(true);
     setMessage({ type: "", text: "" });
 
-    // Extraction de la toute première image valide pour servir d'image de couverture globale
     const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
 
     const payload = {
@@ -132,7 +131,7 @@ export default function NewProductPage() {
       sizes: selectedSizes,
       variants: variants,
       image: firstImageUrl,
-      images: variants.flatMap(v => v.images || []) // Cumul global requis pour ton API/Base de données
+      images: variants.flatMap(v => v.images || [])
     };
 
     try {
@@ -160,7 +159,6 @@ export default function NewProductPage() {
     }
   };
 
-  // Maintient un tri logique à l'affichage des tailles / pointures
   const sortedSizes = Object.keys(selectedSizes).sort((a, b) => {
     if (category === "sneakers") {
       return Number(a) - Number(b);
@@ -172,47 +170,114 @@ export default function NewProductPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700&family=Jost:wght=300;400;500&display=swap');
-        body { background: #F0EDE6; color: #131C14; font-family: 'Jost', sans-serif; margin: 0; padding: 0; }
-        header { background: #131C14; color: #FAFAF8; padding: 20px 40px; display: flex; align-items: center; gap: 20px; }
-        .nav-back { color: #C4A882; text-decoration: none; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
-        .brand { font-family: 'Playfair Display', serif; font-size: 20px; letter-spacing: 2px; color: #FAFAF8; margin-left: auto; }
 
-        .form-container { max-width: 800px; margin: 50px auto; padding: 40px; background: #FAFAF8; border: 1px solid #D4CFC8; border-radius: 2px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
-        .form-title { font-family: 'Playfair Display', serif; font-size: 32px; margin-bottom: 30px; font-weight: 700; text-align: center; }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+        /* FIX CRITIQUE MOBILE ANTI-GLITCH FOND NOIR */
+        html, body {
+          background-color: #F0EDE6 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
+        }
+
+        body { background: #F0EDE6; color: #131C14; font-family: 'Jost', sans-serif; overflow-x: hidden; }
+
+        header {
+          background: #131C14;
+          color: #FAFAF8;
+          padding: 16px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        @media(min-width: 768px) { header { padding: 20px 40px; } }
+
+        .nav-back { color: #C4A882; text-decoration: none; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
+        .brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 2px; color: #FAFAF8; }
+        @media(min-width: 768px) { .brand { font-size: 20px; } }
+
+        .form-container {
+          max-width: 800px;
+          margin: 24px auto 60px auto;
+          padding: 24px 16px;
+          background: #FAFAF8;
+          border: 1px solid #D4CFC8;
+          border-radius: 2px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+          box-sizing: border-box;
+          min-height: 100dvh;
+        }
+        @media(min-width: 768px) { .form-container { margin: 50px auto; padding: 40px; min-height: auto; } }
+
+        .form-title { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 24px; font-weight: 700; text-align: center; line-height: 1.2; }
+        @media(min-width: 768px) { .form-title { font-size: 32px; margin-bottom: 30px; } }
         .form-title em { font-style: italic; font-weight: 400; color: #1A2F1C; }
 
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 24px; }
+        @media(min-width: 600px) { .form-grid { grid-template-columns: 1fr 1fr; gap: 24px; } }
+
         .form-group { display: flex; flex-direction: column; gap: 8px; }
-        .form-group.full { grid-column: span 2; }
+        @media(min-width: 600px) { .form-group.full { grid-column: span 2; } }
 
         label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #7A8A7B; font-weight: 500; }
-        input, select { padding: 14px 16px; border: 1px solid #D4CFC8; background: #F0EDE6; font-family: 'Jost', sans-serif; font-size: 14px; color: #131C14; outline: none; border-radius: 1px; }
+
+        /* DESACTIVER LE ZOOM SMARTPHONE GRACE AUX 16px */
+        input, select {
+          padding: 14px 16px;
+          border: 1px solid #D4CFC8;
+          background: #F0EDE6;
+          font-family: 'Jost', sans-serif;
+          font-size: 16px;
+          color: #131C14;
+          outline: none;
+          border-radius: 1px;
+          -webkit-appearance: none;
+        }
+        @media(min-width: 768px) { input, select { font-size: 14px; } }
         input:focus, select:focus { border-color: #131C14; background: #FAFAF8; }
 
-        .sizes-section { margin-top: 12px; padding: 24px; background: #F0EDE6; border: 1px solid #D4CFC8; }
-        .sizes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 10px; margin-top: 8px; }
-        .size-btn { padding: 12px 6px; border: 1px solid #D4CFC8; background: #FAFAF8; font-family: 'Jost', sans-serif; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; text-align: center; }
+        .sizes-section { margin-top: 12px; padding: 20px; background: #F0EDE6; border: 1px solid #D4CFC8; }
+        @media(min-width: 768px) { .sizes-section { padding: 24px; } }
+
+        .sizes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+        @media(min-width: 480px) { .sizes-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media(min-width: 768px) { .sizes-grid { grid-template-columns: repeat(5, 1fr); } }
+
+        .size-btn { padding: 12px 4px; border: 1px solid #D4CFC8; background: #FAFAF8; font-family: 'Jost', sans-serif; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; text-align: center; -webkit-appearance: none; }
         .size-btn.active { background: #131C14; color: #FAFAF8; border-color: #131C14; }
 
         .variants-section { margin-top: 32px; border-top: 1px solid #D4CFC8; padding-top: 32px; }
         .section-subtitle { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #1A2F1C; font-weight: 600; margin-bottom: 20px; }
-        .variant-card { background: #F0EDE6; border: 1px solid #D4CFC8; padding: 24px; margin-bottom: 20px; position: relative; border-radius: 1px; }
-        .variant-card-header { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px; }
-        .btn-remove-variant { background: none; border: none; color: #8B2020; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; padding-bottom: 14px; font-weight: 500; }
-        .btn-add-variant { background: #FAFAF8; color: #131C14; border: 1px dashed #C4A882; padding: 14px; font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; width: 100%; transition: all 0.3s; font-weight: 500; }
+
+        .variant-card { background: #F0EDE6; border: 1px solid #D4CFC8; padding: 20px; margin-bottom: 20px; position: relative; border-radius: 1px; }
+        @media(min-width: 768px) { .variant-card { padding: 24px; } }
+
+        .variant-card-header { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+        @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
+
+        .btn-remove-variant { background: none; border: none; color: #8B2020; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; padding-bottom: 4px; font-weight: 500; }
+        @media(min-width: 600px) { .btn-remove-variant { padding-bottom: 14px; } }
+
+        .btn-add-variant { background: #FAFAF8; color: #131C14; border: 1px dashed #C4A882; padding: 14px; font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; width: 100%; transition: all 0.3s; font-weight: 500; text-align: center; }
         .btn-add-variant:hover { background: #131C14; color: #FAFAF8; border-color: #131C14; }
 
-        .upload-container { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-        .images-flex { display: flex; flex-wrap: wrap; gap: 12px; }
-        .img-preview-box { width: 68px; height: 90px; border: 1px solid #D4CFC8; background: #FAFAF8; overflow: hidden; position: relative; }
+        .upload-container { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .images-flex { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+        /* STRUCTURATION SÉCURISÉE POUR LE FILL DE NEXT/IMAGE */
+        .img-preview-box { width: 68px; height: 90px; border: 1px solid #D4CFC8; background: #FAFAF8; overflow: hidden; position: relative; z-index: 1; }
         .img-preview-image { object-fit: cover; }
-        .btn-del-img { position: absolute; top: 2px; right: 2px; background: rgba(139,32,32,0.85); color: white; border: none; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; z-index: 4; }
-        .add-photo-trigger { width: 68px; height: 90px; border: 1px dashed #C4A882; display: flex; align-items: center; justify-content: center; color: #1A2F1C; cursor: pointer; font-size: 18px; background: #FAFAF8; }
+        .btn-del-img { position: absolute; top: 2px; right: 2px; background: rgba(139,32,32,0.9); color: white; border: none; width: 18px; height: 18px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; z-index: 10; }
+        .add-photo-trigger { width: 68px; height: 90px; border: 1px dashed #C4A882; display: flex; align-items: center; justify-content: center; color: #1A2F1C; cursor: pointer; font-size: 22px; background: #FAFAF8; font-weight: 300; }
 
-        .checkbox-group { flex-direction: row; align-items: center; gap: 10px; margin-top: 10px; }
-        .checkbox-group input { width: auto; cursor: pointer; transform: scale(1.1); }
+        .checkbox-group { flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; }
+        .checkbox-group input { width: auto; cursor: pointer; transform: scale(1.1); -webkit-appearance: checkbox; }
 
-        .btn-submit { width: 100%; padding: 18px; background: #131C14; color: #FAFAF8; border: none; font-family: 'Jost', sans-serif; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; margin-top: 30px; transition: background 0.2s; }
+        .btn-submit { width: 100%; padding: 18px; background: #131C14; color: #FAFAF8; border: none; font-family: 'Jost', sans-serif; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; margin-top: 30px; transition: background 0.2s; text-align: center; -webkit-appearance: none; }
         .btn-submit:hover:not(:disabled) { background: #2D4A2F; }
         .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -222,7 +287,7 @@ export default function NewProductPage() {
       `}} />
 
       <header>
-        <Link href="/admin" className="nav-back">← Retour Dashboard</Link>
+        <Link href="/admin" className="nav-back">← Dashboard</Link>
         <div className="brand">AYVER ATELIER</div>
       </header>
 
@@ -339,7 +404,7 @@ export default function NewProductPage() {
               {variants.map((v, index) => (
                 <div key={index} className="variant-card">
                   <div className="variant-card-header">
-                    <div className="form-group" style={{ flex: 1 }}>
+                    <div className="form-group" style={{ flex: 1, width: "100%" }}>
                       <label>Couleur / Variante n°{index + 1}</label>
                       <input
                         type="text"
@@ -359,7 +424,7 @@ export default function NewProductPage() {
                   <div className="upload-container">
                     <label>Photos de la variante ({v.color || `n°${index + 1}`}) :</label>
                     <div className="images-flex">
-                      {v.images.map((img, i) => (
+                      {v.images?.map((img, i) => (
                         <div key={i} className="img-preview-box">
                           <Image
                             src={img}
@@ -367,6 +432,7 @@ export default function NewProductPage() {
                             fill
                             sizes="68px"
                             className="img-preview-image"
+                            unoptimized={img.startsWith("data:")}
                           />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>

@@ -28,7 +28,6 @@ export default function AdminLogin() {
         throw new Error(data.error || "Une erreur est survenue");
       }
 
-      // Redirection immédiate vers le tableau de bord principal après le succès
       router.push("/admin");
       router.refresh();
     } catch (err: any) {
@@ -45,6 +44,16 @@ export default function AdminLogin() {
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* FIX MOBILE : On force l'application de la couleur crème sur toute la structure globale */
+        html, body {
+          background-color: #F0EDE6 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
+        }
+
         :root {
           --cream: #F0EDE6; --dark: #131C14; --forest: #1A2F1C;
           --gold: #C4A882; --text-muted: #7A8A7B; --border: #D4CFC8; --white: #FAFAF8;
@@ -55,11 +64,15 @@ export default function AdminLogin() {
           color: var(--dark);
           font-family: 'Jost', sans-serif;
           font-weight: 300;
+          /* FIX MOBILE : min-height dynamique pour éviter les bugs liés à la barre d'outils et au clavier */
           min-height: 100vh;
+          min-height: 100dvh;
+          width: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 20px;
+          box-sizing: border-box;
         }
 
         .login-card {
@@ -70,6 +83,13 @@ export default function AdminLogin() {
           padding: 50px 40px;
           border-radius: 2px;
           box-shadow: 0 20px 40px rgba(19, 28, 20, 0.03);
+        }
+
+        /* FIX RESPONSIVE : Légère réduction des paddings de la carte sur petits smartphones */
+        @media (max-width: 480px) {
+          .login-card {
+            padding: 40px 24px;
+          }
         }
 
         .brand-header {
@@ -124,11 +144,20 @@ export default function AdminLogin() {
           border: 1px solid var(--border);
           background: var(--cream);
           font-family: 'Jost', sans-serif;
-          font-size: 14px;
+          /* FIX RESPONSIVE : 16px minimum empêche iOS de zoomer de force et de casser le layout */
+          font-size: 16px;
           color: var(--dark);
           outline: none;
           transition: border-color 0.3s;
           border-radius: 1px;
+          -webkit-appearance: none;
+        }
+
+        /* Sur desktop on peut repasser à 14px si nécessaire, mais 16px reste très propre */
+        @media (min-width: 768px) {
+          .input-group input {
+            font-size: 14px;
+          }
         }
 
         .input-group input:focus {
@@ -160,6 +189,8 @@ export default function AdminLogin() {
           font-weight: 500;
           transition: background 0.3s;
           margin-top: 10px;
+          border-radius: 1px;
+          -webkit-appearance: none;
         }
 
         .btn-submit:hover:not(:disabled) {

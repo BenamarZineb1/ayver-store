@@ -154,7 +154,6 @@ export default function NewProduct() {
     }
   }
 
-  // Tri sécurisé et typé pour les grilles d'affichage
   const sortedSizes = Object.keys(form.sizes).sort((a, b) => {
     if (form.category === "sneakers") {
       return Number(a) - Number(b);
@@ -166,52 +165,138 @@ export default function NewProduct() {
     <>
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
+
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+        /* PROTECTION RESPONSIVE CONTRE LES BUGS D'ÉCRAN NOIR */
+        html, body {
+          background-color: #F0EDE6 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
+        }
+
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8; --danger:#8B2020;
         }
+
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
-        .admin-container { max-width:1000px; margin:0 auto; padding:80px 40px 120px 40px; min-height:100vh; display:flex; flex-direction:column; justify-content:space-between; }
-        .admin-header { margin-bottom:50px; padding-bottom:24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-end; }
-        .admin-header h1 { font-family:'Playfair Display',serif; font-size:42px; font-weight:700; color:var(--dark); }
+
+        .admin-container {
+          max-width:1000px;
+          margin:0 auto;
+          padding:40px 20px 80px 20px;
+          min-height:100vh;
+          min-height:100dvh;
+          display:flex;
+          flex-direction:column;
+          justify-content:space-between;
+          box-sizing: border-box;
+        }
+
+        @media(min-width: 768px) {
+          .admin-container { padding:80px 40px 120px 40px; }
+        }
+
+        .admin-header {
+          margin-bottom:32px;
+          padding-bottom:20px;
+          border-bottom:1px solid var(--border);
+          display:flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        @media(min-width: 600px) {
+          .admin-header { flex-direction: row; justify-content:space-between; align-items:flex-end; margin-bottom:50px; padding-bottom:24px; }
+        }
+
+        .admin-header h1 { font-family:'Playfair Display',serif; font-size:32px; font-weight:700; color:var(--dark); line-height: 1.2; }
+        @media(min-width: 768px) { .admin-header h1 { font-size:42px; } }
         .admin-header h1 em { font-style:italic; font-weight:400; color:var(--forest); }
-        .btn-back { font-size:11px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; color:var(--text-muted); border:1px solid var(--border); padding:10px 20px; background:var(--white); transition:all 0.3s; font-weight:500; }
+        .admin-header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+        .btn-back { font-size:11px; letter-spacing:2px; text-transform:uppercase; text-decoration:none; color:var(--text-muted); border:1px solid var(--border); padding:10px 20px; background:var(--white); transition:all 0.3s; font-weight:500; text-align: center; width: 100%; }
+        @media(min-width: 600px) { .btn-back { width: auto; } }
         .btn-back:hover { color:var(--dark); border-color:var(--dark); }
-        .form-surface { background:var(--white); border:1px solid var(--border); padding:40px; border-radius:2px; }
-        .form-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:28px; }
+
+        .form-surface { background:var(--white); border:1px solid var(--border); padding:24px; border-radius:2px; }
+        @media(min-width: 768px) { .form-surface { padding:40px; } }
+
+        .form-grid { display:grid; grid-template-columns:1fr; gap:20px; }
+        @media(min-width: 768px) { .form-grid { grid-template-columns:repeat(2, 1fr); gap:28px; } }
+
         .form-field { display:flex; flex-direction:column; gap:8px; }
         .form-field label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:500; }
-        .form-field input, .form-field select { padding:14px 16px; border:1px solid var(--border); background:var(--cream); font-family:'Jost',sans-serif; font-size:14px; color:var(--dark); outline:none; border-radius:1px; }
+
+        /* SÉCURITÉ MOBILE ANTI-ZOOM FORCÉ EN METTANT 16px */
+        .form-field input, .form-field select {
+          padding:14px 16px;
+          border:1px solid var(--border);
+          background:var(--cream);
+          font-family:'Jost',sans-serif;
+          font-size:16px;
+          color:var(--dark);
+          outline:none;
+          border-radius:1px;
+          -webkit-appearance: none;
+        }
+
+        @media(min-width: 768px) {
+          .form-field input, .form-field select { font-size:14px; }
+        }
+
         .variants-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
         .section-subtitle { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--forest); font-weight:600; margin-bottom:20px; }
-        .variant-card { background:var(--cream); border:1px solid var(--border); padding:24px; margin-bottom:20px; position:relative; border-radius:1px; }
-        .variant-card-header { display:flex; gap:16px; align-items:flex-end; margin-bottom:16px; }
-        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:16px; font-weight:500; }
-        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:12px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; }
+        .variant-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
+        @media(min-width: 768px) { .variant-card { padding:24px; } }
+
+        .variant-card-header { display:flex; flex-direction: column; gap:12px; align-items: flex-start; margin-bottom:16px; }
+        @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
+
+        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:4px; font-weight:500; }
+        @media(min-width: 600px) { .btn-remove-variant { padding-bottom:16px; } }
+
+        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:14px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; text-align: center; }
         .btn-add-variant:hover { background:var(--dark); color:var(--white); border-color:var(--dark); }
-        .sizes-section { margin-top:32px; padding:30px; background:var(--cream); border:1px solid var(--border); }
+
+        .sizes-section { margin-top:32px; padding:20px; background:var(--cream); border:1px solid var(--border); }
+        @media(min-width: 768px) { .sizes-section { padding:30px; } }
         .sizes-title { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:16px; text-align:center; }
-        .sizes-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; }
-        .size-toggle-btn { background: var(--white); border: 1px solid var(--border); padding: 14px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
-        .size-label { font-family:'Playfair Display', serif; font-size:16px; font-weight:700; color:var(--dark); }
-        .status-indicator { font-size:8px; letter-spacing:1px; text-transform:uppercase; }
+
+        .sizes-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+        @media(min-width: 480px) { .sizes-grid { grid-template-columns:repeat(4, 1fr); } }
+        @media(min-width: 768px) { .sizes-grid { grid-template-columns:repeat(5, 1fr); gap:12px; } }
+
+        .size-toggle-btn { background: var(--white); border: 1px solid var(--border); padding: 12px 4px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; -webkit-appearance: none; }
+        .size-label { font-family:'Playfair Display', serif; font-size:15px; font-weight:700; color:var(--dark); }
+        .status-indicator { font-size:8px; letter-spacing:0.5px; text-transform:uppercase; }
         .size-in-stock { border-color: var(--forest); background: #FAFDF9; }
         .size-in-stock .status-indicator { color: var(--accent); }
+
         .size-out-of-stock { border-color: #E2DCD5; background: #F7F5F0; opacity: 0.5; }
         .size-out-of-stock .size-label { color: var(--text-muted); text-decoration: line-through; }
         .size-out-of-stock .status-indicator { color: var(--danger); }
-        .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
-        .images-flex { display:flex; flex-wrap:wrap; gap:12px; }
-        .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; }
+
+        .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+        .upload-label { font-size: 11px; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
+        .images-flex { display:flex; flex-wrap:wrap; gap:12px; align-items: center; margin-top: 4px; }
+
+        /* BALISE PARENTE RELATIVE CRITIQUE POUR L'AFFICHAGE DU FILL DE NEXT/IMAGE */
+        .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; z-index: 1; }
         .img-preview-image { object-fit:cover; }
-        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.85); color:white; border:none; width:16px; height:16px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:4; }
-        .add-photo-trigger { width:68px; height:90px; border:1px dashed var(--gold); display:flex; align-items:center; justify-content:center; color:var(--forest); cursor:pointer; font-size:18px; background:var(--white); }
-        .btn-submit-product { margin-top:40px; background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; width:100%; transition: background 0.2s; }
+        .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.9); color:white; border:none; width:18px; height:18px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:10; }
+        .add-photo-trigger { width:68px; height:90px; border:1px dashed var(--gold); display:flex; align-items:center; justify-content:center; color:var(--forest); cursor:pointer; font-size:22px; background:var(--white); font-weight: 300; }
+
+        .btn-submit-product { margin-top:40px; background:var(--dark); color:var(--cream); padding:16px 32px; border:none; font-family:'Jost',sans-serif; letter-spacing:3px; font-size:12px; text-transform:uppercase; cursor:pointer; width:100%; transition: background 0.2s; text-align: center; -webkit-appearance: none; }
         .btn-submit-product:hover:not(:disabled) { background: var(--mid); }
-        .admin-footer { margin-top:80px; display:flex; justify-content:space-between; align-items:center; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); padding-top:24px; }
+
+        .admin-footer { margin-top:60px; display:flex; flex-direction: column; gap: 8px; align-items:center; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); padding-top:24px; text-align: center; }
+        @media(min-width: 600px) { .admin-footer { flex-direction: row; justify-content: space-between; margin-top:80px; font-size:11px; } }
         .footer-brand-mark { font-family:'Playfair Display',serif; font-weight:700; color:var(--forest); }
-        @media(max-width:768px){ .form-grid { grid-template-columns:1fr; } .sizes-grid { grid-template-columns:repeat(3, 1fr); } }
       `}} />
 
       <div className="admin-container">
@@ -305,7 +390,7 @@ export default function NewProduct() {
               {variants.map((v, index) => (
                 <div key={index} className="variant-card">
                   <div className="variant-card-header">
-                    <div className="form-field" style={{ flex: 1 }}>
+                    <div className="form-field" style={{ flex: 1, width: "100%" }}>
                       <label>Couleur / Variante n°{index + 1}</label>
                       <input
                         type="text" required value={v.color}
@@ -323,7 +408,7 @@ export default function NewProduct() {
                   <div className="upload-container">
                     <span className="upload-label">Photos de la variante ({v.color || `n°${index + 1}`}) :</span>
                     <div className="images-flex">
-                      {v.images.map((img, i) => (
+                      {v.images?.map((img, i) => (
                         <div key={i} className="img-preview-box">
                           <Image
                             src={img}
@@ -331,6 +416,7 @@ export default function NewProduct() {
                             fill
                             sizes="68px"
                             className="img-preview-image"
+                            unoptimized={img.startsWith("data:")}
                           />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>
