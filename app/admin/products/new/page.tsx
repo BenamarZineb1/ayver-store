@@ -10,7 +10,8 @@ const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 
 interface ColorVariant {
   color: string;
-  images: string[];
+  images: string[]; // Stocke désormais des URLs d'aperçu éphémères ou du Base64 final
+  rawFiles?: File[]; // Sauvegarde des fichiers physiques pour la conversion finale
 }
 
 interface ProductForm {
@@ -37,7 +38,7 @@ export default function NewProduct() {
   });
 
   const [variants, setVariants] = useState<ColorVariant[]>([
-    { color: "Standard", images: [] }
+    { color: "Standard", images: [], rawFiles: [] }
   ]);
 
   function handleCategoryChange(newCategory: string) {
@@ -59,11 +60,15 @@ export default function NewProduct() {
   }
 
   function addVariant() {
-    setVariants([...variants, { color: "", images: [] }]);
+    setVariants([...variants, { color: "", images: [], rawFiles: [] }]);
   }
 
   function removeVariant(index: number) {
     if (variants.length === 1) return;
+    // Nettoyage des URLs d'aperçu pour éviter les fuites de mémoire
+    variants[index].images.forEach(url => {
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+    });
     setVariants(variants.filter((_, i) => i !== index));
   }
 
@@ -73,37 +78,38 @@ export default function NewProduct() {
     setVariants(updated);
   }
 
+  // Utilisation d'ObjectURLs éphémères pour un rendu instantané et ultra-léger en mémoire
   function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          const base64String = reader.result;
-          setVariants((prev) =>
-            prev.map((variant, i) => {
-              if (i !== variantIndex) return variant;
-              return {
-                ...variant,
-                images: [...(variant.images || []), base64String]
-              };
-            })
-          );
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    const previewUrls = files.map(file => URL.createObjectURL(file));
+
+    setVariants(prev =>
+      prev.map((variant, i) => {
+        if (i !== variantIndex) return variant;
+        return {
+          ...variant,
+          images: [...(variant.images || []), ...previewUrls],
+          rawFiles: [...(variant.rawFiles || []), ...files]
+        };
+      })
+    );
   }
 
   function removeSpecificImage(variantIndex: number, imageIndex: number) {
     setVariants((prev) =>
       prev.map((variant, i) => {
         if (i !== variantIndex) return variant;
+
+        // Révocation de l'URL blob supprimée
+        const urlToDel = variant.images[imageIndex];
+        if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
+
         return {
           ...variant,
-          images: variant.images.filter((_, imgIdx) => imgIdx !== imageIndex)
+          images: variant.images.filter((_, imgIdx) => imgIdx !== imageIndex),
+          rawFiles: variant.rawFiles?.filter((_, fileIdx) => fileIdx !== imageIndex)
         };
       })
     );
@@ -116,26 +122,48 @@ export default function NewProduct() {
     }));
   }
 
+  // Fonction utilitaire asynchrone pour convertir un fichier en Base64 uniquement au submit
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
 
-    const hasSizes = Object.keys(form.sizes).length > 0;
-    const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
-
-    const firstImageUrl = variants?.find(v => v.images?.length > 0)?.images?.[0] || null;
-
-    const payload = {
-      ...form,
-      price: Number(form.price),
-      stock: isGloballyOutOfStock ? 0 : 10,
-      isOutOfStock: isGloballyOutOfStock,
-      variants: variants,
-      image: firstImageUrl,
-      images: variants.flatMap(v => v.images || [])
-    };
-
     try {
+      // Conversion des fichiers physiques en Base64 juste avant l'envoi à l'API
+      const processedVariants = await Promise.all(
+        variants.map(async (v) => {
+          const base64Images = v.rawFiles
+            ? await Promise.all(v.rawFiles.map(file => fileToBase64(file)))
+            : [];
+          return {
+            color: v.color,
+            images: base64Images
+          };
+        })
+      );
+
+      const hasSizes = Object.keys(form.sizes).length > 0;
+      const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
+      const firstImageUrl = processedVariants?.find(v => v.images?.length > 0)?.images?.[0] || null;
+
+      const payload = {
+        ...form,
+        price: Number(form.price),
+        stock: isGloballyOutOfStock ? 0 : 10,
+        isOutOfStock: isGloballyOutOfStock,
+        variants: processedVariants,
+        image: firstImageUrl,
+        images: processedVariants.flatMap(v => v.images || [])
+      };
+
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,6 +171,11 @@ export default function NewProduct() {
       });
 
       if (!res.ok) throw new Error("Erreur serveur lors de la création");
+
+      // Nettoyage final des URL d'aperçus obsolètes
+      variants.forEach(v => v.images.forEach(url => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      }));
 
       router.push("/admin");
       router.refresh();
@@ -168,7 +201,6 @@ export default function NewProduct() {
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-        /* PROTECTION RESPONSIVE CONTRE LES BUGS D'ÉCRAN NOIR */
         html, body {
           background-color: #F0EDE6 !important;
           margin: 0;
@@ -232,7 +264,6 @@ export default function NewProduct() {
         .form-field { display:flex; flex-direction:column; gap:8px; }
         .form-field label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); font-weight:500; }
 
-        /* SÉCURITÉ MOBILE ANTI-ZOOM FORCÉ EN METTANT 16px */
         .form-field input, .form-field select {
           padding:14px 16px;
           border:1px solid var(--border);
@@ -285,7 +316,6 @@ export default function NewProduct() {
         .upload-label { font-size: 11px; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
         .images-flex { display:flex; flex-wrap:wrap; gap:12px; align-items: center; margin-top: 4px; }
 
-        /* BALISE PARENTE RELATIVE CRITIQUE POUR L'AFFICHAGE DU FILL DE NEXT/IMAGE */
         .img-preview-box { width:68px; height:90px; border:1px solid var(--border); background:var(--white); overflow:hidden; position:relative; z-index: 1; }
         .img-preview-image { object-fit:cover; }
         .btn-del-img { position:absolute; top:2px; right:2px; background:rgba(139,32,32,0.9); color:white; border:none; width:18px; height:18px; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; z-index:10; }
@@ -416,7 +446,7 @@ export default function NewProduct() {
                             fill
                             sizes="68px"
                             className="img-preview-image"
-                            unoptimized={img.startsWith("data:")}
+                            unoptimized
                           />
                           <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
                         </div>
