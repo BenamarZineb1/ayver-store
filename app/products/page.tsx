@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { addToCart, getCart } from "@/lib/cart";
 
-// Définition stricte du contrat de données pour éviter les fuites de type "any"
 interface Product {
   id: string;
   name: string;
@@ -28,7 +27,6 @@ const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 export default function CatalogPage() {
   const router = useRouter();
 
-  // États typés avec précision
   const [products, setProducts] = useState<Product[]>([]);
   const [cartCount, setCartCount] = useState<number>(0);
   const [addedProduct, setAddedProduct] = useState<string | null>(null);
@@ -44,7 +42,6 @@ export default function CatalogPage() {
   const [isNewDropOnly, setIsNewDropOnly] = useState<boolean>(false);
   const [sortPrice, setSortPrice] = useState<string>("default");
 
-  // Premier chargement de l'API & écoute réactive globale (Storage Event) pour le compteur de panier
   useEffect(() => {
     fetch("/api/products", { cache: "no-store" })
       .then((r) => r.json())
@@ -52,7 +49,7 @@ export default function CatalogPage() {
         if (Array.isArray(data)) {
           const processedData = data.map((product, index) => ({
             ...product,
-            isNewDrop: index < 4, // Remplacement temporaire avant DB
+            isNewDrop: index < 4,
           }));
           setProducts(processedData);
         }
@@ -66,14 +63,12 @@ export default function CatalogPage() {
 
     updateCartCount();
 
-    // Remplacement du setInterval par un event listener cross-tab/runtime synchrone
     window.addEventListener("storage", updateCartCount);
     return () => {
       window.removeEventListener("storage", updateCartCount);
     };
   }, []);
 
-  // Performance & Robustesse : useMemo recalcule la liste uniquement quand un filtre ou un produit change
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
@@ -103,7 +98,6 @@ export default function CatalogPage() {
       result = result.filter((p) => p.stock === 0 || p.isOutOfStock === true);
     }
 
-    // Correction du bug de filtrage : les accessoires passent, le reste doit posséder explicitement la taille
     if (selectedCategory !== "accessories" && selectedSize) {
       result = result.filter((p) => {
         if (p.category?.toLowerCase() === "accessories") return true;
@@ -153,7 +147,6 @@ export default function CatalogPage() {
       image: displayImage
     } as any);
 
-    // Mettre à jour immédiatement le compteur local suite à l'action
     const updatedCart = getCart();
     setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
 
@@ -262,9 +255,21 @@ export default function CatalogPage() {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8;
+        }
+
+        /* PROTECTION CRITIQUE CONTRE L'ÉCRAN NOIR */
+        html, body {
+          background-color: #F0EDE6 !important;
+          color: #131C14 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
         }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
 
@@ -326,7 +331,6 @@ export default function CatalogPage() {
         .prod-card { cursor:pointer; text-decoration: none; color: inherit; display: block; }
         .prod-card.is-sold-out { opacity: 0.65; cursor: not-allowed; }
 
-        /* Correction parent container Next.js <Image fill /> */
         .prod-img { aspect-ratio:3/4; background:var(--dark); position:relative; overflow:hidden; margin-bottom:16px; border-radius:2px; }
         .product-image { object-fit:cover; transition:transform .5s ease; }
         .prod-img-inner { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:clamp(40px,6vw,72px); font-weight:900; color:rgba(255,255,255,.05); font-style:italic; transition:transform .5s ease; }
@@ -404,7 +408,7 @@ export default function CatalogPage() {
         </div>
       </nav>
 
-      {/* ÉTAPE 1 : GRILLE DES CATÉGORIES AVEC COUVERTURES RÉELLES */}
+      {/* ÉTAPE 1 : GRILLE DES CATÉGORIES */}
       {viewMode === 'categories' && (
         <section className="categories" id="collections">
           <div className="section-header">
@@ -454,7 +458,7 @@ export default function CatalogPage() {
             <FilterFilters />
           </aside>
 
-          {/* TIROIR MODAL RESPONSIVE MOBILE ACCESSIBLE */}
+          {/* MODAL FILTRES MOBILE */}
           <div className={`mobile-filter-drawer ${isMobileFilterOpen ? "open" : ""}`}>
             <div className="drawer-overlay" onClick={() => setIsMobileFilterOpen(false)}></div>
             <div className="drawer-content">

@@ -56,10 +56,22 @@ export default function HomePage() {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8; --danger:#8B2020;
         }
+
+        /* CORRECTION CRITIQUE CONTRE L'ÉCRAN NOIR SUR MOBILE */
+        html, body {
+          background-color: #F0EDE6 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
+        }
+
         html { scroll-behavior: smooth; }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
 

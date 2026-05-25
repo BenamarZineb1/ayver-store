@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AYVER STORE | Console de Gestion",
-  description: "Espace d'administration et gestion de la marque AYVER",
+  title: "AYVER STORE | Espace Vestiaire",
+  description: "Streetwear, Sneakers, et Jerseys Premium",
 };
 
 export default function RootLayout({
@@ -24,10 +24,16 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ backgroundColor: "#F0EDE6", color: "#131C14" }}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body
+        className="min-h-full flex flex-col"
+        style={{ backgroundColor: "#F0EDE6", color: "#131C14", margin: 0, padding: 0 }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

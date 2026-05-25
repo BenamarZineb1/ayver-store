@@ -6,7 +6,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { addToCart, getCart } from "@/lib/cart";
 
-// Contrat d'interface strict pour le produit et ses variantes
 interface Variant {
   color?: string;
   images?: string[];
@@ -44,7 +43,6 @@ export default function ProductPage() {
       .then((data: Product) => {
         setProduct(data);
 
-        // Définir la première image active disponible de manière sécurisée
         const firstImg =
           data.images?.[0] ||
           data.image ||
@@ -52,7 +50,6 @@ export default function ProductPage() {
           "/placeholder.jpg";
         setActiveImage(firstImg);
 
-        // Sélection automatique de la première taille disponible cochée à true
         if (data.sizes && Object.keys(data.sizes).length > 0) {
           const availableSizes = Object.keys(data.sizes).filter((s) => data.sizes?.[s] === true);
           if (availableSizes.length > 0) {
@@ -73,7 +70,6 @@ export default function ProductPage() {
 
     updateCartCount();
 
-    // Remplacement du setInterval par un EventListener Storage natif et propre
     window.addEventListener("storage", updateCartCount);
     return () => {
       window.removeEventListener("storage", updateCartCount);
@@ -91,7 +87,6 @@ export default function ProductPage() {
       image: activeImage
     } as any);
 
-    // Synchronisation synchrone immédiate du compteur après ajout
     const updatedCart = getCart();
     setCartCount(updatedCart.reduce((acc, item) => acc + item.qty, 0));
 
@@ -108,8 +103,14 @@ export default function ProductPage() {
   if (!product) {
     return (
       <>
+        {/* BLINDAGE SUR L'ÉCRAN DE CHARGEMENT */}
         <style dangerouslySetInnerHTML={{ __html: `
-          body { background: #F0EDE6; }
+          html, body {
+            background-color: #F0EDE6 !important;
+            color: #131C14 !important;
+            margin: 0;
+            padding: 0;
+          }
           .loading { padding: 120px 20px; text-align: center; font-family: 'Playfair Display', serif; color: #7A8A7B; font-size: 18px; font-style: italic; }
         `}} />
         <div className="loading">Chargement de la création...</div>
@@ -136,9 +137,21 @@ export default function ProductPage() {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,600;0,700;0,900;1,400;1,700&family=Jost:wght=200;300;400;500&display=swap');
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
         :root{
           --cream:#F0EDE6; --dark:#131C14; --forest:#1A2F1C; --mid:#2D4A2F;
           --accent:#3A6B3D; --gold:#C4A882; --text-muted:#7A8A7B; --border:#D4CFC8; --white:#FAFAF8; --danger:#8B2020;
+        }
+
+        /* PROTECTION CRITIQUE CONTRE L'ÉCRAN NOIR MOBILE */
+        html, body {
+          background-color: #F0EDE6 !important;
+          color: #131C14 !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-text-size-adjust: 100%;
         }
         body { background:var(--cream); color:var(--dark); font-family:'Jost',sans-serif; font-weight:300; overflow-x:hidden; }
 
@@ -158,7 +171,6 @@ export default function ProductPage() {
         .product-container { max-width:1200px; margin:0 auto; padding:60px 40px 100px 40px; }
         .product-layout { display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; align-items:start; }
 
-        /* GALERIE AVEC FIX POUR COMPOSANT NEXT.JS IMAGE FILL */
         .gallery-wrapper { display:flex; flex-direction:column; gap:16px; }
         .image-box { background:var(--dark); display:flex; align-items:center; justify-content:center; aspect-ratio:3/4; overflow:hidden; border-radius:2px; position:relative; }
         .main-product-image { object-fit:cover; }
@@ -227,10 +239,12 @@ export default function ProductPage() {
         @media (max-width:640px) { .features-inner { grid-template-columns: 1fr 1fr; } .product-container { padding:30px 20px 60px 20px; } .nav-links { display:none; } }
       `}} />
 
+      {/* NOTIFICATION COMPTEUR */}
       <div className={`toast ${addedProduct ? "show" : ""}`}>
         ✨ Ajouté au Panier : {addedProduct} ({size})
       </div>
 
+      {/* BARRE DE NAVIGATION */}
       <nav id="navbar">
         <ul className="nav-links">
           <li><Link href="/products">CATALOGUE</Link></li>
@@ -248,10 +262,11 @@ export default function ProductPage() {
         </div>
       </nav>
 
+      {/* PIÈCE DE SÉLECTION */}
       <div className="product-container">
         <div className="product-layout">
 
-          {/* GALERIE D'IMAGES COMPATIBLE NEXT.JS */}
+          {/* GALERIE PRINCIPALE */}
           <div className="gallery-wrapper">
             <div className="image-box">
               <div className="image-placeholder">{initialLetter}</div>
@@ -299,7 +314,7 @@ export default function ProductPage() {
             )}
           </div>
 
-          {/* DÉTAILS PRODUIT */}
+          {/* FICHE DESCRIPTIVE COMPLÈTE */}
           <div className="info-box">
             <span className="info-category">{product.club || product.category || "Atelier AYVER"}</span>
             <h1 className="info-title">{product.name}</h1>
@@ -313,7 +328,7 @@ export default function ProductPage() {
               {!isGloballyOut ? "✓ Pièce disponible en stock" : "✕ Édition archivée / épuisée"}
             </div>
 
-            {/* VARIANTES DE COULEURS */}
+            {/* OPTIONS DE VARIANTES */}
             {product.variants && product.variants.length > 0 && (
               <div className="variant-section">
                 <p className="size-label">Couleurs & Déclinaisons</p>
@@ -331,7 +346,7 @@ export default function ProductPage() {
               </div>
             )}
 
-            {/* SÉLECTEUR DE TAILLES */}
+            {/* RECONNAISSANCE DES CAPACITÉS DE TAILLE */}
             <div className="size-section">
               <p className="size-label">
                 {product.category === "sneakers" ? "Sélectionner la Pointure" : "Sélectionner la Taille"}
@@ -368,7 +383,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* ATTRIBUTS DE MARQUE */}
+      {/* GRID LOGISTIQUE DE CONFIANCE */}
       <div className="features">
         <div className="features-inner">
           <div className="feat">
