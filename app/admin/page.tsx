@@ -7,14 +7,34 @@ import Link from "next/link";
 export default function AdminDashboardRoot() {
   const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchProducts = () => {
+    setErrorMsg(null);
     fetch("/api/products", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setProducts(data);
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          router.push("/admin/login");
+          return null;
+        }
+        if (!res.ok) throw new Error("Impossible de charger les articles.");
+        return res.json();
       })
-      .catch((err) => console.error("Erreur chargement admin:", err));
+      .then((data) => {
+        if (data && Array.isArray(data)) {
+          setProducts(data);
+        } else {
+          setProducts([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Erreur chargement admin:", err);
+        setErrorMsg("Une erreur est survenue lors de la récupération des données.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -26,7 +46,6 @@ export default function AdminDashboardRoot() {
       const res = await fetch("/api/admin/logout", { method: "POST" });
       if (res.ok) {
         router.push("/admin/login");
-        router.refresh();
       } else {
         alert("Erreur lors de la déconnexion.");
       }
@@ -36,7 +55,8 @@ export default function AdminDashboardRoot() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Êtes-vous certain de vouloir retirer définitivement "${name}" du vestiaire ?`)) {
+    const cleanName = name || "cet article";
+    if (!confirm(`Êtes-vous certain de vouloir retirer définitivement "${cleanName}" du vestiaire ?`)) {
       return;
     }
 
@@ -46,7 +66,7 @@ export default function AdminDashboardRoot() {
       });
 
       if (res.ok) {
-        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setProducts((prev) => prev.filter((p) => p && p.id !== id));
       } else {
         alert("Une erreur est survenue lors de la tentative de suppression.");
       }
@@ -63,7 +83,6 @@ export default function AdminDashboardRoot() {
 
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-        /* FIX CRITIQUE CONTRE L'ÉCRAN NOIR SUR MOBILE */
         html, body {
           background-color: #F0EDE6 !important;
           margin: 0;
@@ -105,7 +124,6 @@ export default function AdminDashboardRoot() {
         @media(min-width: 600px) { .btn-add { width: auto; padding: 14px 28px; font-size: 12px; } }
         .btn-add:hover { background: #1A2F1C; }
 
-        /* RE-CONCEPTION RESPONSIVE COMPLETE DU COMPOSANT TABLEAU -> EN CARTES SUR MOBILE */
         .table-responsive-wrapper { width: 100%; }
 
         .desktop-table { display: none; width: 100%; border-collapse: collapse; background: #FAFAF8; border: 1px solid #D4CFC8; }
@@ -127,7 +145,6 @@ export default function AdminDashboardRoot() {
         .action-link.danger { color: #8B2020; }
         .action-link.danger:hover { color: #131C14; }
 
-        /* AFFICHAGE EN GRILLE DE CARTES SUR SMARTPHONES */
         .mobile-cards-grid { display: flex; flex-direction: column; gap: 16px; }
         @media(min-width: 768px) { .mobile-cards-grid { display: none; } }
 
@@ -139,6 +156,7 @@ export default function AdminDashboardRoot() {
         .mobile-card-actions { display: flex; gap: 12px; align-items: center; margin-top: 12px; border-top: 1px solid #EAE6DF; padding-top: 10px; }
 
         .empty-state { text-align: center; padding: 40px; color: #7A8A7B; background: #FAFAF8; border: 1px solid #D4CFC8; }
+        .error-state { text-align: center; padding: 40px; color: #8B2020; background: #FAF3F3; border: 1px solid #E6D0D0; }
       `}} />
 
       <header>
@@ -149,34 +167,112 @@ export default function AdminDashboardRoot() {
       <div className="main-container">
         <div className="panel-header">
           <h1 className="panel-title">Espace Vestiaire Confidentiel</h1>
-          <Link href="/admin/products/new" className="btn-add">
+          <Link href="/admin/products/new" className="btn-add" prefetch={false}>
             + Ajouter un Article
           </Link>
         </div>
 
         <div className="table-responsive-wrapper">
-          {/* STRUCTURE ADAPTATIVE TABLEAU : VISIBLE SUR PC / TABLETTE */}
-          <table className="desktop-table">
-            <thead>
-              <tr>
-                <th>Visuel</th>
-                <th>Modèle / Article</th>
-                <th>Catégorie</th>
-                <th>Prix</th>
-                <th>Statut Stock</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => {
-                const isOut = p.stock === 0 || p.isOutOfStock;
-                const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+          {loading ? (
+            <div className="empty-state">Chargement du vestiaire AYVER...</div>
+          ) : errorMsg ? (
+            <div className="error-state">⚠️ {errorMsg}</div>
+          ) : (
+            <>
+              {/* STRUCTURE ADAPTATIVE TABLEAU : VISIBLE SUR PC / TABLETTE */}
+              <table className="desktop-table">
+                <thead>
+                  <tr>
+                    <th>Visuel</th>
+                    <th>Modèle / Article</th>
+                    <th>Catégorie</th>
+                    <th>Prix</th>
+                    <th>Statut Stock</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p, index) => {
+                    if (!p) return null;
+                    const isOut = p.stock === 0 || p.isOutOfStock;
+                    const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+                    const name = p.name || "Article Sans Nom";
+                    const id = p.id || `temp-${index}`;
 
-                return (
-                  <tr key={p.id}>
-                    <td>
+                    return (
+                      <tr key={id}>
+                        <td>
+                          {mainImg ? (
+                            <img src={mainImg} alt={name} className="img-preview" />
+                          ) : (
+                            <div style={{
+                              width: '45px',
+                              height: '55px',
+                              background: '#1A2F1C',
+                              color: '#C4A882',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              borderRadius: '1px'
+                            }}>
+                              {name.charAt(0)}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <strong style={{ fontWeight: 500 }}>{name}</strong>
+                          <div style={{ fontSize: '11px', color: '#7A8A7B', marginTop: '2px' }}>ID: {id}</div>
+                        </td>
+                        <td style={{ textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>
+                          {p.category || "—"}
+                        </td>
+                        <td>{p.price || 0} DH</td>
+                        <td>
+                          {isOut ? (
+                            <span className="badge-status out">Épuisé</span>
+                          ) : (
+                            <span className="badge-status in">En Stock ({p.stock || "✓"})</span>
+                          )}
+                        </td>
+                        <td className="actions-cell">
+                          <Link href={`/admin/products/${id}`} className="action-link" prefetch={false}>
+                            Éditer
+                          </Link>
+                          <span style={{ color: '#D4CFC8' }}>|</span>
+                          <button
+                            onClick={() => handleDelete(id, name)}
+                            className="action-link danger"
+                          >
+                            Supprimer
+                          </button>
+                          <span style={{ color: '#D4CFC8' }}>|</span>
+                          <Link href={`/products/${id}`} target="_blank" className="action-link">
+                            Client ↗
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* STRUCTURE GRILLE DE CARTES : VISIBLE EXCLUSIVEMENT SUR MOBILE */}
+              <div className="mobile-cards-grid">
+                {products.map((p, index) => {
+                  if (!p) return null;
+                  const isOut = p.stock === 0 || p.isOutOfStock;
+                  const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
+                  const name = p.name || "Article Sans Nom";
+                  const id = p.id || `temp-${index}`;
+                  const shortId = typeof id === "string" ? id.slice(0, 8) : "N/A";
+
+                  return (
+                    <div key={id} className="product-mobile-card">
                       {mainImg ? (
-                        <img src={mainImg} alt={p.name} className="img-preview" />
+                        <img src={mainImg} alt={name} className="img-preview" />
                       ) : (
                         <div style={{
                           width: '45px',
@@ -189,114 +285,51 @@ export default function AdminDashboardRoot() {
                           fontSize: '13px',
                           fontWeight: '600',
                           textTransform: 'uppercase',
-                          borderRadius: '1px'
+                          borderRadius: '1px',
+                          flexShrink: 0
                         }}>
-                          {p.name ? p.name.charAt(0) : 'A'}
+                          {name.charAt(0)}
                         </div>
                       )}
-                    </td>
-                    <td>
-                      <strong style={{ fontWeight: 500 }}>{p.name}</strong>
-                      <div style={{ fontSize: '11px', color: '#7A8A7B', marginTop: '2px' }}>ID: {p.id}</div>
-                    </td>
-                    <td style={{ textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>
-                      {p.category}
-                    </td>
-                    <td>{p.price} DH</td>
-                    <td>
-                      {isOut ? (
-                        <span className="badge-status out">Épuisé</span>
-                      ) : (
-                        <span className="badge-status in">En Stock ({p.stock || "✓"})</span>
-                      )}
-                    </td>
-                    <td className="actions-cell">
-                      <Link href={`/admin/products/${p.id}`} className="action-link">
-                        Éditer
-                      </Link>
-                      <span style={{ color: '#D4CFC8' }}>|</span>
-                      <button
-                        onClick={() => handleDelete(p.id, p.name)}
-                        className="action-link danger"
-                      >
-                        Supprimer
-                      </button>
-                      <span style={{ color: '#D4CFC8' }}>|</span>
-                      <Link href={`/products/${p.id}`} target="_blank" className="action-link">
-                        Client ↗
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <div className="mobile-card-content">
+                        <div className="mobile-card-title">{name}</div>
+                        <div className="mobile-card-meta">{p.category || "—"} — ID: {shortId}...</div>
+                        <div className="mobile-card-price">{p.price || 0} DH</div>
+                        <div>
+                          {isOut ? (
+                            <span className="badge-status out" style={{ marginTop: '4px' }}>Épuisé</span>
+                          ) : (
+                            <span className="badge-status in" style={{ marginTop: '4px' }}>En Stock ({p.stock || "✓"})</span>
+                          )}
+                        </div>
+                        <div className="mobile-card-actions">
+                          <Link href={`/admin/products/${id}`} className="action-link" prefetch={false}>
+                            Éditer
+                          </Link>
+                          <span style={{ color: '#D4CFC8' }}>|</span>
+                          <button
+                            onClick={() => handleDelete(id, name)}
+                            className="action-link danger"
+                          >
+                            Supprimer
+                          </button>
+                          <span style={{ color: '#D4CFC8' }}>|</span>
+                          <Link href={`/products/${id}`} target="_blank" className="action-link">
+                            Client ↗
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          {/* STRUCTURE GRILLE DE CARTES : VISIBLE EXCLUSIVEMENT SUR MOBILE */}
-          <div className="mobile-cards-grid">
-            {products.map((p) => {
-              const isOut = p.stock === 0 || p.isOutOfStock;
-              const mainImg = p.image || p.images?.[0] || p.variants?.[0]?.images?.[0] || null;
-
-              return (
-                <div key={p.id} className="product-mobile-card">
-                  {mainImg ? (
-                    <img src={mainImg} alt={p.name} className="img-preview" />
-                  ) : (
-                    <div style={{
-                      width: '45px',
-                      height: '55px',
-                      background: '#1A2F1C',
-                      color: '#C4A882',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      textTransform: 'uppercase',
-                      borderRadius: '1px',
-                      flexShrink: 0
-                    }}>
-                      {p.name ? p.name.charAt(0) : 'A'}
-                    </div>
-                  )}
-                  <div className="mobile-card-content">
-                    <div className="mobile-card-title">{p.name}</div>
-                    <div className="mobile-card-meta">{p.category} — ID: {p.id.slice(0, 8)}...</div>
-                    <div className="mobile-card-price">{p.price} DH</div>
-                    <div>
-                      {isOut ? (
-                        <span className="badge-status out" style={{ marginTop: '4px' }}>Épuisé</span>
-                      ) : (
-                        <span className="badge-status in" style={{ marginTop: '4px' }}>En Stock ({p.stock})</span>
-                      )}
-                    </div>
-                    <div className="mobile-card-actions">
-                      <Link href={`/admin/products/${p.id}`} className="action-link">
-                        Éditer
-                      </Link>
-                      <span style={{ color: '#D4CFC8' }}>|</span>
-                      <button
-                        onClick={() => handleDelete(p.id, p.name)}
-                        className="action-link danger"
-                      >
-                        Supprimer
-                      </button>
-                      <span style={{ color: '#D4CFC8' }}>|</span>
-                      <Link href={`/products/${p.id}`} target="_blank" className="action-link">
-                        Client ↗
-                      </Link>
-                    </div>
-                  </div>
+              {products.length === 0 && (
+                <div className="empty-state">
+                  Aucun produit disponible actuellement dans l'atelier.
                 </div>
-              );
-            })}
-          </div>
-
-          {products.length === 0 && (
-            <div className="empty-state">
-              Aucun produit disponible actuellement dans l'atelier.
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

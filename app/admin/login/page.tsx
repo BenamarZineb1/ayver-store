@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 
 export default function AdminLogin() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +26,9 @@ export default function AdminLogin() {
         throw new Error(data.error || "Identifiants invalides ou erreur serveur");
       }
 
-      // 1. Redirection pure
-      router.push("/admin");
+      // 🟢 FIX DE SÉCURITÉ CRITIQUE : force un rechargement complet de la page vers /admin
+      // pour que le middleware lise instantanément le nouveau cookie enregistré.
+      window.location.href = "/admin";
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -184,6 +183,9 @@ export default function AdminLogin() {
           margin-top: 10px;
           border-radius: 1px;
           -webkit-appearance: none;
+          display: block;
+          text-align: center;
+          text-decoration: none;
         }
 
         .btn-submit:hover:not(:disabled) {
