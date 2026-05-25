@@ -21,10 +21,9 @@ model Product {
   isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
   sizes        Json     @default("{\"L\": true, \"M\": true, \"S\": true, \"XL\": true, \"XXL\": true}")
 
-  // 🟢 AJOUTS CRUCIAUX POUR CORRESPONDRE À TES ROUTES :
-  image        String?  // Requis pour `image: image || null` dans ton code
-  images       String[] // Requis pour `images: images || []` dans ton code
-  variants     Json     @default("[]") // Requis pour `variants: variants || []` dans ton code
+  // 🟢 Les deux seuls champs photos requis par ton API et ton formulaire
+  image        String?  // Photo principale de couverture
+  images       String[] // Toutes les photos de la galerie à plat
 
   @@map("products")
 }
