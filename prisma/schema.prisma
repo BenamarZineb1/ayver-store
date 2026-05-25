@@ -16,11 +16,15 @@ model Product {
   category     String   @db.VarChar(100)
   stock        Int      @default(0)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  images       String[]
   collection   String   @default("Street Classic") @db.VarChar(100)
   gender       String   @default("unisex") @db.VarChar(20)
   isOutOfStock Boolean  @default(false) @map("is_out_of_stock")
   sizes        Json     @default("{\"L\": true, \"M\": true, \"S\": true, \"XL\": true, \"XXL\": true}")
+
+  // 🟢 AJOUTS CRUCIAUX POUR CORRESPONDRE À TES ROUTES :
+  image        String?  // Requis pour `image: image || null` dans ton code
+  images       String[] // Requis pour `images: images || []` dans ton code
+  variants     Json     @default("[]") // Requis pour `variants: variants || []` dans ton code
 
   @@map("products")
 }

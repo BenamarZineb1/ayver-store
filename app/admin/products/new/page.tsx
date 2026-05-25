@@ -8,12 +8,6 @@ import Image from "next/image";
 const CLOTHING_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SNEAKER_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44"];
 
-interface ColorVariant {
-  color: string;
-  images: string[]; // Stocke désormais des URLs d'aperçu éphémères ou du Base64 final
-  rawFiles?: File[]; // Sauvegarde des fichiers physiques pour la conversion finale
-}
-
 interface ProductForm {
   name: string;
   price: string;
@@ -26,6 +20,10 @@ export default function NewProduct() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  // 🟢 GESTION SIMPLIFIÉE DES IMAGES (Sans structure de variante de couleur)
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+
   const initialSizes: Record<string, boolean> = {};
   CLOTHING_SIZES.forEach(sz => { initialSizes[sz] = true; });
 
@@ -36,10 +34,6 @@ export default function NewProduct() {
     club: "",
     sizes: initialSizes
   });
-
-  const [variants, setVariants] = useState<ColorVariant[]>([
-    { color: "Standard", images: [], rawFiles: [] }
-  ]);
 
   function handleCategoryChange(newCategory: string) {
     let updatedSizes: Record<string, boolean> = {};
@@ -59,57 +53,23 @@ export default function NewProduct() {
     }));
   }
 
-  function addVariant() {
-    setVariants([...variants, { color: "", images: [], rawFiles: [] }]);
-  }
-
-  function removeVariant(index: number) {
-    if (variants.length === 1) return;
-    variants[index].images.forEach(url => {
-      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
-    });
-    setVariants(variants.filter((_, i) => i !== index));
-  }
-
-  function handleColorChange(index: number, value: string) {
-    const updated = [...variants];
-    updated[index].color = value;
-    setVariants(updated);
-  }
-
-  function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
+  // 🟢 AJOUT DES IMAGES DIRECTEMENT DANS LES TABLEAUX SIMPLES
+  function handleImages(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-
     const previewUrls = files.map(file => URL.createObjectURL(file));
 
-    setVariants(prev =>
-      prev.map((variant, i) => {
-        if (i !== variantIndex) return variant;
-        return {
-          ...variant,
-          images: [...(variant.images || []), ...previewUrls],
-          rawFiles: [...(variant.rawFiles || []), ...files]
-        };
-      })
-    );
+    setImagePreviews(prev => [...prev, ...previewUrls]);
+    setRawFiles(prev => [...prev, ...files]);
   }
 
-  function removeSpecificImage(variantIndex: number, imageIndex: number) {
-    setVariants((prev) =>
-      prev.map((variant, i) => {
-        if (i !== variantIndex) return variant;
+  // 🟢 SUPPRESSION D'UNE IMAGE PAR SON INDEX UNIQUE
+  function removeSpecificImage(imageIndex: number) {
+    const urlToDel = imagePreviews[imageIndex];
+    if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
 
-        const urlToDel = variant.images[imageIndex];
-        if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
-
-        return {
-          ...variant,
-          images: variant.images.filter((_, imgIdx) => imgIdx !== imageIndex),
-          rawFiles: variant.rawFiles?.filter((_, fileIdx) => fileIdx !== imageIndex)
-        };
-      })
-    );
+    setImagePreviews(prev => prev.filter((_, idx) => idx !== imageIndex));
+    setRawFiles(prev => prev.filter((_, idx) => idx !== imageIndex));
   }
 
   function toggleSize(size: string) {
@@ -119,7 +79,7 @@ export default function NewProduct() {
     }));
   }
 
-  // 🟢 OPTIMISATION CRITIQUE : Compresse et réduit l'image côté client avant conversion en Base64
+  // OPTIMISATION CRITIQUE : Compresse et réduit l'image côté client avant conversion en Base64
   const fileToCompressedBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -130,7 +90,6 @@ export default function NewProduct() {
         img.onload = () => {
           const canvas = document.createElement("canvas");
 
-          // Définition de dimensions maximales raisonnables pour le web (Ex: 1000px max)
           const MAX_WIDTH = 1000;
           const MAX_HEIGHT = 1000;
           let width = img.width;
@@ -155,7 +114,6 @@ export default function NewProduct() {
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Exportation en JPEG avec une qualité de 75% (gain de poids massif, qualité préservée)
           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
           resolve(compressedBase64);
         };
@@ -170,31 +128,28 @@ export default function NewProduct() {
     setLoading(true);
 
     try {
-      // Conversion et compression simultanée de toutes les photos
-      const processedVariants = await Promise.all(
-        variants.map(async (v) => {
-          const base64Images = v.rawFiles
-            ? await Promise.all(v.rawFiles.map(file => fileToCompressedBase64(file)))
-            : [];
-          return {
-            color: v.color,
-            images: base64Images
-          };
-        })
+      // 🟢 COMPRESSION DIRECTE DU TABLEAU DE FICHIERS SIMPLES
+      const base64Images = await Promise.all(
+        rawFiles.map(file => fileToCompressedBase64(file))
       );
 
       const hasSizes = Object.keys(form.sizes).length > 0;
       const isGloballyOutOfStock = hasSizes ? Object.values(form.sizes).every(status => status === false) : false;
-      const firstImageUrl = processedVariants?.find(v => v.images?.length > 0)?.images?.[0] || null;
+      const firstImageUrl = base64Images[0] || null;
 
+      // 🟢 PAYLOAD PARFAITEMENT ALIGNÉ SUR TON API ET SANS COMPOSANTE VARIANT
       const payload = {
-        ...form,
+        name: form.name,
         price: Number(form.price),
+        category: form.category,
+        club: form.club,
+        sizes: form.sizes,
         stock: isGloballyOutOfStock ? 0 : 10,
         isOutOfStock: isGloballyOutOfStock,
-        variants: processedVariants,
-        image: firstImageUrl,
-        images: processedVariants.flatMap(v => v.images || [])
+        collection: "Essential Drop",
+        gender: "unisex",
+        image: firstImageUrl,  // Première image comme couverture
+        images: base64Images  // Toutes les images à plat
       };
 
       const res = await fetch("/api/products", {
@@ -208,9 +163,10 @@ export default function NewProduct() {
         throw new Error(errData.error || "Erreur serveur lors de la création");
       }
 
-      variants.forEach(v => v.images.forEach(url => {
+      // Nettoyage des objets d'aperçu éphémères
+      imagePreviews.forEach(url => {
         if (url.startsWith("blob:")) URL.revokeObjectURL(url);
-      }));
+      });
 
       router.push("/admin");
       router.refresh();
@@ -315,19 +271,10 @@ export default function NewProduct() {
           .form-field input, .form-field select { font-size:14px; }
         }
 
-        .variants-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
+        .gallery-section { margin-top:32px; border-top:1px solid var(--border); padding-top:32px; }
         .section-subtitle { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--forest); font-weight:600; margin-bottom:20px; }
-        .variant-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
-        @media(min-width: 768px) { .variant-card { padding:24px; } }
-
-        .variant-card-header { display:flex; flex-direction: column; gap:12px; align-items: flex-start; margin-bottom:16px; }
-        @media(min-width: 600px) { .variant-card-header { flex-direction: row; align-items: flex-end; gap: 16px; } }
-
-        .btn-remove-variant { background:none; border:none; color:var(--danger); font-size:11px; text-transform:uppercase; letter-spacing:1px; cursor:pointer; padding-bottom:4px; font-weight:500; }
-        @media(min-width: 600px) { .btn-remove-variant { padding-bottom:16px; } }
-
-        .btn-add-variant { background:var(--white); color:var(--dark); border:1px dashed var(--gold); padding:14px 24px; font-family:'Jost',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; width:100%; transition:all 0.3s; font-weight:500; text-align: center; }
-        .btn-add-variant:hover { background:var(--dark); color:var(--white); border-color:var(--dark); }
+        .gallery-card { background:var(--cream); border:1px solid var(--border); padding:20px; margin-bottom:20px; position:relative; border-radius:1px; }
+        @media(min-width: 768px) { .gallery-card { padding:24px; } }
 
         .sizes-section { margin-top:32px; padding:20px; background:var(--cream); border:1px solid var(--border); }
         @media(min-width: 768px) { .sizes-section { padding:30px; } }
@@ -347,7 +294,7 @@ export default function NewProduct() {
         .size-out-of-stock .size-label { color: var(--text-muted); text-decoration: line-through; }
         .size-out-of-stock .status-indicator { color: var(--danger); }
 
-        .upload-container { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+        .upload-container { display:flex; flex-direction:column; gap:8px; }
         .upload-label { font-size: 11px; letter-spacing: 1px; color: var(--text-muted); font-weight: 500; }
         .images-flex { display:flex; flex-wrap:wrap; gap:12px; align-items: center; margin-top: 4px; }
 
@@ -368,7 +315,7 @@ export default function NewProduct() {
         <header className="admin-header">
           <div>
             <h1>Ajouter un <em>Produit</em></h1>
-            <p>Fiche article unifiée avec variantes multiples</p>
+            <p>Fiche article simplifiée avec galerie photo unique</p>
           </div>
           <Link href="/admin" className="btn-back">Retour au Dashboard</Link>
         </header>
@@ -449,61 +396,40 @@ export default function NewProduct() {
               </div>
             )}
 
-            <div className="variants-section">
-              <div className="section-subtitle">Variantes de couleurs & Galeries photos dédiées</div>
+            {/* 🟢 BLOC GALERIE DE PHOTOS NETTOYÉ ET ADAPTÉ */}
+            <div className="gallery-section">
+              <div className="section-subtitle">Gestion des visuels produits</div>
 
-              {variants.map((v, index) => (
-                <div key={index} className="variant-card">
-                  <div className="variant-card-header">
-                    <div className="form-field" style={{ flex: 1, width: "100%" }}>
-                      <label>Couleur / Variante n°{index + 1}</label>
-                      <input
-                        type="text" required value={v.color}
-                        onChange={(e) => handleColorChange(index, e.target.value)}
-                        placeholder="Ex: Kaki"
-                      />
-                    </div>
-                    {variants.length > 1 && (
-                      <button type="button" className="btn-remove-variant" onClick={() => removeVariant(index)}>
-                        Supprimer
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="upload-container">
-                    <span className="upload-label">Photos de la variante ({v.color || `n°${index + 1}`}) :</span>
-                    <div className="images-flex">
-                      {v.images?.map((img, i) => (
-                        <div key={i} className="img-preview-box">
-                          <Image
-                            src={img}
-                            alt="Aperçu déclinaison"
-                            fill
-                            sizes="68px"
-                            className="img-preview-image"
-                            unoptimized
-                          />
-                          <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(index, i)}>✕</button>
-                        </div>
-                      ))}
-                      <label htmlFor={`file-up-${index}`} className="add-photo-trigger">+</label>
-                      <input
-                        type="file" multiple accept="image/*"
-                        onChange={(e) => handleImages(e, index)}
-                        style={{ display: "none" }} id={`file-up-${index}`}
-                      />
-                    </div>
+              <div className="gallery-card">
+                <div className="upload-container">
+                  <span className="upload-label">Photos du produit (la première sera la photo principale) :</span>
+                  <div className="images-flex">
+                    {imagePreviews.map((img, i) => (
+                      <div key={i} className="img-preview-box">
+                        <Image
+                          src={img}
+                          alt="Aperçu produit"
+                          fill
+                          sizes="68px"
+                          className="img-preview-image"
+                          unoptimized
+                        />
+                        <button type="button" className="btn-del-img" onClick={() => removeSpecificImage(i)}>✕</button>
+                      </div>
+                    ))}
+                    <label htmlFor="file-up-main" className="add-photo-trigger">+</label>
+                    <input
+                      type="file" multiple accept="image/*"
+                      onChange={handleImages}
+                      style={{ display: "none" }} id="file-up-main"
+                    />
                   </div>
                 </div>
-              ))}
-
-              <button type="button" className="btn-add-variant" onClick={addVariant}>
-                + Ajouter une autre couleur / option pour ce produit
-              </button>
+              </div>
             </div>
 
             <button className="btn-submit-product" disabled={loading}>
-              {loading ? "Enregistrement dans le vestiaire AYVER..." : "Enregistrer le Produit Multi-Variantes"}
+              {loading ? "Enregistrement dans le vestiaire AYVER..." : "Enregistrer le Produit"}
             </button>
           </form>
         </main>
