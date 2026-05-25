@@ -65,7 +65,6 @@ export default function NewProduct() {
 
   function removeVariant(index: number) {
     if (variants.length === 1) return;
-    // Nettoyage des URLs d'aperçu pour éviter les fuites de mémoire
     variants[index].images.forEach(url => {
       if (url.startsWith("blob:")) URL.revokeObjectURL(url);
     });
@@ -78,7 +77,6 @@ export default function NewProduct() {
     setVariants(updated);
   }
 
-  // Utilisation d'ObjectURLs éphémères pour un rendu instantané et ultra-léger en mémoire
   function handleImages(e: ChangeEvent<HTMLInputElement>, variantIndex: number) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
@@ -102,7 +100,6 @@ export default function NewProduct() {
       prev.map((variant, i) => {
         if (i !== variantIndex) return variant;
 
-        // Révocation de l'URL blob supprimée
         const urlToDel = variant.images[imageIndex];
         if (urlToDel.startsWith("blob:")) URL.revokeObjectURL(urlToDel);
 
@@ -122,12 +119,48 @@ export default function NewProduct() {
     }));
   }
 
-  // Fonction utilitaire asynchrone pour convertir un fichier en Base64 uniquement au submit
-  const fileToBase64 = (file: File): Promise<string> => {
+  // 🟢 OPTIMISATION CRITIQUE : Compresse et réduit l'image côté client avant conversion en Base64
+  const fileToCompressedBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+
+          // Définition de dimensions maximales raisonnables pour le web (Ex: 1000px max)
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(event.target?.result as string);
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Exportation en JPEG avec une qualité de 75% (gain de poids massif, qualité préservée)
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error("Erreur de chargement de l'image pour compression"));
+      };
       reader.onerror = error => reject(error);
     });
   };
@@ -137,11 +170,11 @@ export default function NewProduct() {
     setLoading(true);
 
     try {
-      // Conversion des fichiers physiques en Base64 juste avant l'envoi à l'API
+      // Conversion et compression simultanée de toutes les photos
       const processedVariants = await Promise.all(
         variants.map(async (v) => {
           const base64Images = v.rawFiles
-            ? await Promise.all(v.rawFiles.map(file => fileToBase64(file)))
+            ? await Promise.all(v.rawFiles.map(file => fileToCompressedBase64(file)))
             : [];
           return {
             color: v.color,
@@ -170,18 +203,20 @@ export default function NewProduct() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Erreur serveur lors de la création");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Erreur serveur lors de la création");
+      }
 
-      // Nettoyage final des URL d'aperçus obsolètes
       variants.forEach(v => v.images.forEach(url => {
         if (url.startsWith("blob:")) URL.revokeObjectURL(url);
       }));
 
       router.push("/admin");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Une erreur est survenue lors de l'enregistrement du nouveau produit.");
+      alert(error.message || "Une erreur est survenue lors de l'enregistrement du nouveau produit.");
     } finally {
       setLoading(false);
     }
@@ -346,7 +381,7 @@ export default function NewProduct() {
                 <input
                   type="text" required value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Ex: Espagne Home Jersey 2026"
+                  placeholder="Ex: T-shirt Col Rond Kaki - BOSS"
                 />
               </div>
 
@@ -355,7 +390,7 @@ export default function NewProduct() {
                 <input
                   type="number" required value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="450"
+                  placeholder="550"
                 />
               </div>
 
@@ -380,7 +415,7 @@ export default function NewProduct() {
                 <input
                   type="text" value={form.club}
                   onChange={(e) => setForm({ ...form, club: e.target.value })}
-                  placeholder="Ex: Espagne, Casablanca, Nike"
+                  placeholder="Ex: BOSS"
                 />
               </div>
             </div>
@@ -425,7 +460,7 @@ export default function NewProduct() {
                       <input
                         type="text" required value={v.color}
                         onChange={(e) => handleColorChange(index, e.target.value)}
-                        placeholder="Ex: Rouge (Home), Blanc (Away), Noir..."
+                        placeholder="Ex: Kaki"
                       />
                     </div>
                     {variants.length > 1 && (
